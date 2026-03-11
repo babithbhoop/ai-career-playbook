@@ -2,15 +2,15 @@ export default async (req, context) => {
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: { message: "Use POST method" } }), {
       status: 405,
-      headers: { "Content-Type": "application/json" },
+      headers: { "content-type": "application/json" },
     });
   }
 
-  const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+  const apiKey = Netlify.env.get("ANTHROPIC_API_KEY");
   if (!apiKey) {
     return new Response(
       JSON.stringify({ error: { message: "API key not configured" } }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
+      { status: 500, headers: { "content-type": "application/json" } }
     );
   }
 
@@ -20,7 +20,7 @@ export default async (req, context) => {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
+        "content-type": "application/json",
         "x-api-key": apiKey,
         "anthropic-version": "2023-06-01",
       },
@@ -35,12 +35,12 @@ export default async (req, context) => {
 
     return new Response(JSON.stringify(data), {
       status: response.status,
-      headers: { "Content-Type": "application/json" },
+      headers: { "content-type": "application/json" },
     });
   } catch (err) {
     return new Response(
       JSON.stringify({ error: { message: "Edge function error: " + err.message } }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
+      { status: 500, headers: { "content-type": "application/json" } }
     );
   }
 };
