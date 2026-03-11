@@ -293,38 +293,38 @@ export default function App() {
         <div className="Aby">
 
           {step === 1 && <div className="Q"><div className="Qn">01</div><h2 className="Qt">What grade is your child in?</h2><p className="Qd">This determines the timeline for your action plan.</p>
-            <div className="Ol">{GRADES.map(g => <button key={g.id} className={`Ob ${a.grade === g.id ? "s" : ""}`} onClick={() => set("grade", g.id)}><span className="Or">{a.grade === g.id ? "\u25C9" : "\u25CB"}</span>{g.label}</button>)}</div>
+            <div className="Ol">{GRADES.map(g => <button key={g.id} className={`Ob ${a.grade === g.id ? "s" : ""}`} onClick={() => set("grade", g.id)}><span className="Or">{a.grade === g.id ? "◉" : "○"}</span>{g.label}</button>)}</div>
           </div>}
 
           {step === 2 && <div className="Q"><div className="Qn">02</div><h2 className="Qt">What are their top interests?</h2><p className="Qd">Pick up to 3 areas. We will find careers at the intersection.</p>
             <div className="Ig">{INTERESTS.map(o => <button key={o.id} className={`Ic ${a.interests.includes(o.id) ? "s" : ""}`} onClick={() => toggleInt(o.id)}>
               <span className="Ii">{o.ico}</span><span className="Il">{o.label}</span><span className="Ie">{o.ex}</span>
-              {a.interests.includes(o.id) && <span className="Ik">\u2713</span>}
+              {a.interests.includes(o.id) && <span className="Ik">✓</span>}
             </button>)}</div>
             <p className="Qh">{a.interests.length}/3 selected</p>
           </div>}
 
           {step === 3 && <div className="Q"><div className="Qn">03</div><h2 className="Qt">What matters most for their career?</h2><p className="Qd">Pick the single most important factor.</p>
             <div className="Ol">{PRIORITIES.map(p => <button key={p.id} className={`Ob hd ${a.priority === p.id ? "s" : ""}`} onClick={() => set("priority", p.id)}>
-              <span className="Or">{a.priority === p.id ? "\u25C9" : "\u25CB"}</span><div><div className="Om">{p.label}</div><div className="Od">{p.desc}</div></div>
+              <span className="Or">{a.priority === p.id ? "◉" : "○"}</span><div><div className="Om">{p.label}</div><div className="Od">{p.desc}</div></div>
             </button>)}</div>
           </div>}
 
           {step === 4 && <div className="Q"><div className="Qn">04</div><h2 className="Qt">How does your child feel about technology?</h2><p className="Qd">This shapes how we integrate AI fluency into their path.</p>
             <div className="Ol">{TECHC.map(t => <button key={t.id} className={`Ob hd ${a.techComfort === t.id ? "s" : ""}`} onClick={() => set("techComfort", t.id)}>
-              <span className="Or">{a.techComfort === t.id ? "\u25C9" : "\u25CB"}</span><div><div className="Om">{t.label}</div><div className="Od">{t.desc}</div></div>
+              <span className="Or">{a.techComfort === t.id ? "◉" : "○"}</span><div><div className="Om">{t.label}</div><div className="Od">{t.desc}</div></div>
             </button>)}</div>
           </div>}
 
           {step === 5 && <div className="Q"><div className="Qn">05</div><h2 className="Qt">What is your biggest career concern?</h2><p className="Qd">Your playbook will address this head-on with data.</p>
             <div className="Ol">{CONCERNS.map(c => <button key={c.id} className={`Ob ${a.concern === c.id ? "s" : ""}`} onClick={() => set("concern", c.id)}>
-              <span className="Or">{a.concern === c.id ? "\u25C9" : "\u25CB"}</span>{c.label}
+              <span className="Or">{a.concern === c.id ? "◉" : "○"}</span>{c.label}
             </button>)}</div>
           </div>}
 
           {step === 6 && <div className="Q"><div className="Qn">06</div><h2 className="Qt">What are their strongest subjects?</h2><p className="Qd">Pick up to 4. We will connect academic strengths to career paths.</p>
             <div className="Sg">{SUBJECTS.map(s => <button key={s.id} className={`Sc ${a.subjects.includes(s.id) ? "s" : ""}`} onClick={() => toggleSub(s.id)}>
-              {a.subjects.includes(s.id) && <span className="Sk">\u2713</span>}{s.label}
+              {a.subjects.includes(s.id) && <span className="Sk">✓</span>}{s.label}
             </button>)}</div>
             <p className="Qh">{a.subjects.length}/4 selected</p>
           </div>}
@@ -371,7 +371,7 @@ export default function App() {
           <div className="Gp"><div className="Gf" style={{ width: `${progress}%` }}/></div>
           <div className="Gl">
             {[["Matching AI-resistant careers to interests", 8], ["Connecting activities to career paths", 25], ["Building year-by-year plan", 42], ["Creating counselor talking points", 58], ["Addressing your concerns with data", 75], ["Formatting student profile and playbook", 90]].map(([t, v]) =>
-              <div key={t} className={`Gx ${progress > v ? "on" : ""}`}>{progress > v ? "\u2713" : "\u25CB"} {t}</div>
+              <div key={t} className={`Gx ${progress > v ? "on" : ""}`}>{progress > v ? "✓" : "○"} {t}</div>
             )}
           </div>
         </div>
