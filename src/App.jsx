@@ -112,27 +112,27 @@ STUDENT: Grade: ${a.grade}, Interests: ${interestLabels}, Priority: ${a.priority
 
 AI RESISTANCE DATA: Mental Health Counselor 98%, Firefighter 97%, Physician 96%, Diplomat 95%, Nurse Practitioner 94%(45.7% growth $120K), Electrician 94%(8M+ unfilled), Social Worker 93%, Renewable Energy 92%(22-44% growth), Cybersecurity 88%(32% growth $112K), Creative Director 85%, Robotics 85%, Trial Lawyer 82%, AI/ML Engineer 78%(36% growth), UX/UI 78%, Financial Advisor 76%, Software Dev 62%, Accountant 45%, Paralegal 35%. PwC: 56% AI wage premium every industry. Goldman Sachs: youth tech unemployment +3pts, UK grad roles -46%. Skills changing 66% faster in AI jobs.
 
-Return this exact JSON structure:
+Return this JSON structure. Keep ALL string values under 100 characters. Use simple characters only - no quotes, apostrophes, or special punctuation inside values:
 {
   "careers": [
-    {"name":"career name","score":88,"fit":"1 sentence why this fits THIS student referencing their activities/subjects","insight":"1 surprising data point"}
+    {"name":"career name","score":88,"fit":"why it fits this student","insight":"one data point"}
   ],
   "yearPlan": [
-    {"year":"11th Grade","courses":"specific courses","activities":"specific extracurriculars","summer":"summer plan","portfolio":"what to build","aiMilestone":"AI skill to learn"}
+    {"year":"11th Grade","courses":"courses to take","activities":"clubs and activities","summer":"summer plan","portfolio":"what to build","aiMilestone":"AI skill"}
   ],
   "buildOn": [
-    {"activity":"their existing activity","connection":"how it connects to AI-resistant careers","action":"deepen or add"}
+    {"activity":"existing activity","connection":"how it links to careers","action":"deepen"}
   ],
   "demoInterest": [
-    {"action":"specific action this semester","why":"why it impresses admissions"}
+    {"action":"what to do this semester","why":"why it helps"}
   ],
-  "counselorQs": ["question 1 tailored to this student","question 2"],
-  "talkingPoints": ["point about AI careers for counselor meeting"],
-  "concernResponse": {"headline":"1 sentence reframe","data":"key data point","steps":["step 1","step 2","step 3"]},
-  "aiRule": {"insight":"how 56% premium applies to their interests","action":"specific way to combine domain + AI"}
+  "counselorQs": ["question 1","question 2"],
+  "talkingPoints": ["talking point 1"],
+  "concernResponse": {"headline":"reframe in one line","data":"key stat","steps":["step 1","step 2","step 3"]},
+  "aiRule": {"insight":"how 56% premium applies","action":"combine domain plus AI how"}
 }
 
-5 careers, plan for each remaining year through college year 1, 3-4 buildOn items, 4 demoInterest, 5 counselorQs, 3 talkingPoints. Be specific to THIS student. Reference their actual activities and accomplishments.`;
+Include exactly: 5 careers, year plan for each remaining year through college year 1, 3 buildOn, 4 demoInterest, 5 counselorQs, 3 talkingPoints. Be specific to THIS student.`;
 }
 
 /* ================================================================
@@ -272,21 +272,34 @@ export default function App() {
     let s = str.trim();
     // Remove markdown fencing
     s = s.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/, "").trim();
+    // Find the first { and last }
+    const start = s.indexOf("{");
+    const end = s.lastIndexOf("}");
+    if (start !== -1 && end !== -1 && end > start) {
+      s = s.substring(start, end + 1);
+    }
     // Try parsing as-is first
     try { return JSON.parse(s); } catch {}
-    // Fix common issues: trailing commas before ] or }
+    // Fix common issues: trailing commas
     s = s.replace(/,\s*([\]}])/g, "$1");
     try { return JSON.parse(s); } catch {}
     // If truncated, try to close open brackets/braces
     let opens = 0, openb = 0;
     for (const ch of s) { if (ch === "[") opens++; if (ch === "]") opens--; if (ch === "{") openb++; if (ch === "}") openb--; }
-    // Remove any trailing partial string/value
-    s = s.replace(/,\s*"[^"]*$/, "");  // remove trailing incomplete key
-    s = s.replace(/,\s*$/, "");  // remove trailing comma
+    // Remove trailing partial values
+    s = s.replace(/,\s*"[^"]*$/, "");
+    s = s.replace(/,\s*$/, "");
     for (let i = 0; i < opens; i++) s += "]";
     for (let i = 0; i < openb; i++) s += "}";
     s = s.replace(/,\s*([\]}])/g, "$1");
     try { return JSON.parse(s); } catch {}
+    // Last resort: try to extract just careers array
+    try {
+      const careersMatch = s.match(/"careers"\s*:\s*(\[[\s\S]*?\])/);
+      if (careersMatch) {
+        return { careers: JSON.parse(careersMatch[1].replace(/,\s*([\]}])/g, "$1")) };
+      }
+    } catch {}
     return null;
   };
 
@@ -305,7 +318,8 @@ export default function App() {
       const txt = data.content?.filter(b => b.type === "text").map(b => b.text).join("") || "";
       const parsed = repairJSON(txt);
       if (!parsed) {
-        setError("Could not parse the playbook data. Please try again.");
+        // Show first 200 chars of raw response for debugging
+        setError("JSON parse failed. Raw response starts with: " + txt.substring(0, 200) + "...");
         setStep(11); setLoading(false); return;
       }
       setProgress(100);
