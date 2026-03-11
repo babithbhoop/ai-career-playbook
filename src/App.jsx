@@ -106,34 +106,111 @@ function buildPrompt(a) {
   const subjectLabels = a.subjects.map(s => SUBJECTS.find(x => x.id === s)?.label).join(", ");
   const interestLabels = a.interests.map(i => INTERESTS.find(x => x.id === i)?.label).join(", ");
 
-  return `You are a career strategist. You MUST return ONLY a valid JSON object. No markdown. No backticks. No text before or after the JSON. Start with { and end with }. Keep all string values short (under 150 characters each). Do not use special characters or line breaks inside JSON string values.
+  return `Return ONLY valid JSON. No markdown. No backticks. Start with { end with }. All strings under 80 chars. No special characters in values.
 
-STUDENT: Grade: ${a.grade}, Interests: ${interestLabels}, Priority: ${a.priority}, Tech: ${a.techComfort}, Concern: ${concernLabel}, Subjects: ${subjectLabels}, Activities: ${a.activities || "None"}, Accomplishments: ${a.accomplishments || "None"}${a.specificCareer ? ", Considering: " + a.specificCareer : ""}${a.extraContext ? ", Context: " + a.extraContext : ""}
+Student: ${a.grade} grade, interests: ${interestLabels}, priority: ${a.priority}, subjects: ${subjectLabels}, activities: ${a.activities || "none"}, accomplishments: ${a.accomplishments || "none"}${a.specificCareer ? ", considering: " + a.specificCareer : ""}
 
-AI RESISTANCE DATA: Mental Health Counselor 98%, Firefighter 97%, Physician 96%, Diplomat 95%, Nurse Practitioner 94%(45.7% growth $120K), Electrician 94%(8M+ unfilled), Social Worker 93%, Renewable Energy 92%(22-44% growth), Cybersecurity 88%(32% growth $112K), Creative Director 85%, Robotics 85%, Trial Lawyer 82%, AI/ML Engineer 78%(36% growth), UX/UI 78%, Financial Advisor 76%, Software Dev 62%, Accountant 45%, Paralegal 35%. PwC: 56% AI wage premium every industry. Goldman Sachs: youth tech unemployment +3pts, UK grad roles -46%. Skills changing 66% faster in AI jobs.
+Careers DB: Counselor 98%, Firefighter 97%, Physician 96%, Diplomat 95%, NP 94%, Electrician 94%, Social Worker 93%, Renewable Tech 92%, Cybersecurity 88%, Creative Dir 85%, Robotics 85%, Trial Lawyer 82%, AI Engineer 78%, UX 78%, Fin Advisor 76%, Software Dev 62%, Accountant 45%
 
-Return this JSON structure. Keep ALL string values under 100 characters. Use simple characters only - no quotes, apostrophes, or special punctuation inside values:
-{
-  "careers": [
-    {"name":"career name","score":88,"fit":"why it fits this student","insight":"one data point"}
-  ],
-  "yearPlan": [
-    {"year":"11th Grade","courses":"courses to take","activities":"clubs and activities","summer":"summer plan","portfolio":"what to build","aiMilestone":"AI skill"}
-  ],
-  "buildOn": [
-    {"activity":"existing activity","connection":"how it links to careers","action":"deepen"}
-  ],
-  "demoInterest": [
-    {"action":"what to do this semester","why":"why it helps"}
-  ],
-  "counselorQs": ["question 1","question 2"],
-  "talkingPoints": ["talking point 1"],
-  "concernResponse": {"headline":"reframe in one line","data":"key stat","steps":["step 1","step 2","step 3"]},
-  "aiRule": {"insight":"how 56% premium applies","action":"combine domain plus AI how"}
+{"careers":[{"n":"career name","s":88,"f":"why fits this student"}],"buildOn":[{"a":"their activity","c":"career connection","d":"deepen or add"}],"qs":["counselor question"],"concern":"response to: ${concernLabel}","aiTip":"how to combine their interests with AI skills"}
+
+5 careers, 3 buildOn, 5 qs. Be specific to this student.`;
 }
 
-Include exactly: 5 careers, year plan for each remaining year through college year 1, 3 buildOn, 4 demoInterest, 5 counselorQs, 3 talkingPoints. Be specific to THIS student.`;
+// ---- Client-side template generators (no API cost) ----
+const YEAR_TEMPLATES = {
+  "8th": [
+    { year: "8th Grade", courses: "Honors Math and English, Intro to Computer Science if available", activities: "Join 2 clubs aligned with interests, start volunteering", summer: "Summer camp or program in area of interest", portfolio: "Start a journal of career interests and activities", aiMilestone: "Explore ChatGPT and AI tools for homework help" },
+    { year: "9th Grade", courses: "Honors/AP track in strong subjects, foreign language", activities: "Deepen club involvement, seek leadership roles", summer: "Job shadow or informational interviews in fields of interest", portfolio: "Create a digital portfolio of projects and activities", aiMilestone: "Use AI tools for research projects, learn what AI can and cannot do" },
+    { year: "10th Grade", courses: "AP classes in strongest subjects, consider dual enrollment", activities: "Take leadership position in primary activity, add community service", summer: "Internship, research program, or intensive summer program", portfolio: "Build 1-2 projects demonstrating skills in interest area", aiMilestone: "Learn basic data analysis or use AI in a subject-specific project" },
+    { year: "11th Grade", courses: "Most rigorous schedule in strong subjects, SAT/ACT prep", activities: "Lead primary organization, mentor younger students", summer: "Competitive internship or research with a mentor", portfolio: "Complete a significant project showcasing expertise", aiMilestone: "Use AI tools professionally in internship or research" },
+    { year: "12th Grade", courses: "Continue rigor, explore college-level courses", activities: "Senior leadership, capstone project", summer: "Pre-college program or continued professional experience", portfolio: "Polish portfolio for college applications", aiMilestone: "Write about AI and your field in college essays" },
+    { year: "College Year 1", courses: "Declare or explore major, take intro AI/data course", activities: "Join professional clubs, seek research opportunities", summer: "Industry internship in target career field", portfolio: "Professional resume with AI skills highlighted", aiMilestone: "Complete an online AI certification relevant to your major" },
+  ],
+  "9th": null, "10th": null, "11th": null, "12th": null, "college": null, "adult": null,
+};
+// Generate year plan from templates starting at the right grade
+function getYearPlan(gradeId) {
+  const allYears = YEAR_TEMPLATES["8th"]; // base template
+  const gradeOrder = ["8th", "9th", "10th", "11th", "12th", "college"];
+  const startIdx = gradeOrder.indexOf(gradeId);
+  if (startIdx === -1) return allYears.slice(-2); // adult: just college years
+  return allYears.slice(startIdx);
 }
+
+const DEMO_INTEREST_TEMPLATES = {
+  healthcare: [
+    { action: "Volunteer at a local hospital or clinic this semester", why: "Direct healthcare exposure shows genuine commitment to admissions" },
+    { action: "Start a health awareness campaign at your school", why: "Leadership in health-related initiatives demonstrates initiative" },
+    { action: "Shadow a healthcare professional for a day", why: "Shows proactive career exploration beyond classroom" },
+    { action: "Take a Red Cross first aid or CPR certification course", why: "Tangible credential that connects to healthcare career path" },
+  ],
+  tech: [
+    { action: "Build a personal project and publish it on GitHub", why: "Tangible evidence of technical skills beyond coursework" },
+    { action: "Enter a hackathon or coding competition this semester", why: "Competitive tech events stand out on applications" },
+    { action: "Start a tech blog or YouTube channel explaining concepts", why: "Shows communication skills alongside technical knowledge" },
+    { action: "Contribute to an open source project", why: "Real-world collaboration experience that colleges value" },
+  ],
+  trades: [
+    { action: "Enroll in a vocational class or apprenticeship program", why: "Direct skill-building shows commitment to the path" },
+    { action: "Volunteer for Habitat for Humanity or similar building projects", why: "Hands-on community service combining skills and service" },
+    { action: "Get a part-time job in a related trade", why: "Paid experience demonstrates real-world commitment" },
+    { action: "Research and visit a local trade school or union apprenticeship", why: "Shows you are serious and informed about the pathway" },
+  ],
+  creative: [
+    { action: "Build an online portfolio showcasing your best work", why: "Creative portfolios are more powerful than transcripts for creative fields" },
+    { action: "Enter a regional or national arts competition", why: "Awards and recognition validate creative talent to admissions" },
+    { action: "Collaborate on a creative project with peers and document it", why: "Collaboration and documentation show professional mindset" },
+    { action: "Attend a workshop or masterclass in your creative discipline", why: "Continued learning shows dedication beyond school requirements" },
+  ],
+  business: [
+    { action: "Start a small business or side project this semester", why: "Entrepreneurial initiative is the strongest signal for business programs" },
+    { action: "Join DECA, FBLA, or similar business competition club", why: "Competitive business clubs are recognized nationally by admissions" },
+    { action: "Shadow a professional in your target business field", why: "Shows you understand the reality of the career, not just the theory" },
+    { action: "Take an online course in financial literacy or entrepreneurship", why: "Self-directed learning demonstrates genuine intellectual curiosity" },
+  ],
+  law: [
+    { action: "Join or start a debate team or Model UN chapter", why: "Argumentation and public speaking are core legal skills" },
+    { action: "Volunteer with a legal aid organization", why: "Exposure to real legal work shows serious career interest" },
+    { action: "Write an op-ed for your school paper on a policy issue", why: "Published writing on policy demonstrates analytical thinking" },
+    { action: "Attend a local court session to observe proceedings", why: "Shows proactive exploration of the legal profession" },
+  ],
+  science: [
+    { action: "Design and conduct an independent research project", why: "Original research is the gold standard for science programs" },
+    { action: "Enter a science fair or research competition", why: "Competitive science achievements stand out in applications" },
+    { action: "Reach out to a local university professor for mentorship", why: "University connections show initiative and research readiness" },
+    { action: "Join a citizen science project in your area of interest", why: "Real-world data collection shows applied scientific thinking" },
+  ],
+  education: [
+    { action: "Tutor younger students in your strong subjects", why: "Direct teaching experience is the strongest signal for education programs" },
+    { action: "Volunteer at an after-school program or summer camp", why: "Working with youth in structured settings shows commitment" },
+    { action: "Create educational content for a topic you love", why: "Content creation shows you can explain complex ideas clearly" },
+    { action: "Shadow a teacher and observe different teaching styles", why: "Reflective observation shows mature interest in pedagogy" },
+  ],
+  public: [
+    { action: "Volunteer with your local fire department or EMT squad", why: "Direct service experience is essential for public safety careers" },
+    { action: "Get CPR and first aid certified", why: "Tangible credentials that demonstrate readiness and commitment" },
+    { action: "Organize a community service project at your school", why: "Leadership in service shows the public service mindset" },
+    { action: "Interview a first responder and write about their career", why: "Shows reflective understanding of the profession" },
+  ],
+  diplomacy: [
+    { action: "Join Model UN or start a chapter at your school", why: "Model UN is the most recognized activity for international relations programs" },
+    { action: "Study a second language and seek conversation practice", why: "Language skills are essential for diplomacy and global careers" },
+    { action: "Write about a current international issue for your school paper", why: "Published analysis shows intellectual engagement with global affairs" },
+    { action: "Attend a public lecture or webinar on international affairs", why: "Shows self-directed learning about global issues" },
+  ],
+};
+
+function getDemoInterest(interests) {
+  const primary = interests[0] || "tech";
+  return DEMO_INTEREST_TEMPLATES[primary] || DEMO_INTEREST_TEMPLATES.tech;
+}
+
+const TALKING_POINTS = [
+  "PwC research shows workers with AI skills earn 56% more than peers in the same role, across every industry. We want to make sure our child builds AI fluency alongside their primary interests.",
+  "Entry-level jobs are being disrupted fastest. Goldman Sachs data shows tech grad roles fell 46% in the UK in one year. We want to ensure our child has demonstrable skills before graduating.",
+  "The World Economic Forum projects 170 million new jobs created but 92 million displaced by 2030. We want to focus on careers that require human skills AI cannot replicate.",
+];
 
 /* ================================================================
    VISUAL COMPONENTS
@@ -308,7 +385,7 @@ export default function App() {
     try {
       const res = await fetch("/api/generate", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 3000, messages: [{ role: "user", content: buildPrompt(a) }] }),
+        body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1200, messages: [{ role: "user", content: buildPrompt(a) }] }),
       });
       const data = await res.json();
       if (data.error) {
@@ -318,12 +395,38 @@ export default function App() {
       const txt = data.content?.filter(b => b.type === "text").map(b => b.text).join("") || "";
       const parsed = repairJSON(txt);
       if (!parsed) {
-        // Show first 200 chars of raw response for debugging
-        setError("JSON parse failed. Raw response starts with: " + txt.substring(0, 200) + "...");
+        setError("JSON parse failed. Raw: " + txt.substring(0, 300) + "...");
         setStep(11); setLoading(false); return;
       }
+      // Merge API response with client-side templates
+      const fullPb = {
+        careers: (parsed.careers || []).map(c => ({
+          name: c.n || c.name || "Career",
+          score: c.s || c.score || 80,
+          fit: c.f || c.fit || "",
+          insight: CAREER_DB[c.n || c.name]?.growth ? (CAREER_DB[c.n || c.name].growth + " projected growth") : "High demand field",
+        })),
+        yearPlan: getYearPlan(a.grade),
+        buildOn: (parsed.buildOn || []).map(b => ({
+          activity: b.a || b.activity || "",
+          connection: b.c || b.connection || "",
+          action: b.d || b.action || "deepen",
+        })),
+        demoInterest: getDemoInterest(a.interests),
+        counselorQs: parsed.qs || parsed.counselorQs || [],
+        talkingPoints: TALKING_POINTS,
+        concernResponse: {
+          headline: parsed.concern || "The data shows a path forward",
+          data: "PwC found workers with AI skills earn 56% more in every industry. The premium doubled in 12 months.",
+          steps: ["Research the top career match from this playbook this week", "Have a conversation with your child using the talking points above", "Schedule a counselor meeting and bring this printed playbook"],
+        },
+        aiRule: {
+          insight: parsed.aiTip || "Combining domain expertise with AI fluency is the highest-value career strategy in every field",
+          action: "Start with one AI tool relevant to their primary interest area this month",
+        },
+      };
       setProgress(100);
-      setTimeout(() => { setPb(parsed); setStep(11); setLoading(false); }, 400);
+      setTimeout(() => { setPb(fullPb); setStep(11); setLoading(false); }, 400);
     } catch (err) {
       setError("Error: " + err.message);
       setStep(11); setLoading(false);
