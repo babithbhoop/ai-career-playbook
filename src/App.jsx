@@ -168,12 +168,17 @@ export default function App() {
         body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 4000, messages: [{ role: "user", content: buildPrompt(a) }] }),
       });
       const data = await res.json();
+      if (data.error) {
+        setProgress(100);
+        setTimeout(() => { setPlaybook("Error: " + (data.error.message || JSON.stringify(data.error)) + "\n\nPlease try again or contact support."); setStep(11); setLoading(false); }, 400);
+        return;
+      }
       const txt = data.content?.filter(b => b.type === "text").map(b => b.text).join("\n") || "We had trouble generating your playbook. Please refresh and try again.";
       setProgress(100);
       setTimeout(() => { setPlaybook(txt); setStep(11); setLoading(false); }, 400);
-    } catch {
+    } catch (err) {
       setProgress(100);
-      setPlaybook("We are experiencing high demand. Please refresh and try again in a moment.");
+      setPlaybook("Connection error: " + err.message + "\n\nPlease refresh and try again.");
       setStep(11); setLoading(false);
     }
   };
@@ -233,14 +238,14 @@ export default function App() {
     <div class="hdr">
       <h1>Your Personalized Career Playbook</h1>
       <p>Future-Proof Careers in the Age of AI</p>
-      <p>Prepared by Quantumleap Insights LLC \u00B7 ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p>
+      <p>Prepared by Quantumleap Insights LLC &middot; ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p>
     </div>
     ${buildProfileHTML()}
     ${playbook.replace(/^## (.+)$/gm, '<h2>$1</h2>').replace(/^### (.+)$/gm, '<h3>$1</h3>').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/^---$/gm, '<hr/>').replace(/\n/g, '<br/>')}
     <div class="ftr">
       <p>Research from 17 sources: WEF, Goldman Sachs, McKinsey, PwC, BLS, Stanford HAI, Anthropic, and 10 more.<br/>
       Full interactive guide: https://thriving-shortbread-3bf879.netlify.app<br/>
-      \u00A9 ${new Date().getFullYear()} Quantumleap Insights LLC \u00B7 Babith Bhoopalan</p>
+      &copy; ${new Date().getFullYear()} Quantumleap Insights LLC &middot; Babith Bhoopalan</p>
     </div></body></html>`);
     w.document.close();
     w.print();
@@ -257,7 +262,7 @@ export default function App() {
       {step === 0 && <div className="W">
         <div className="Wo o1"/><div className="Wo o2"/><div className="Wo o3"/>
         <div className="Wc">
-          <div className="Wb">Free \u00B7 17 Research Sources \u00B7 35+ Careers Scored</div>
+          <div className="Wb">Free · 17 Research Sources · 35+ Careers Scored</div>
           <h1 className="Wh">Get Your Child's<br/><span className="Wa">AI-Proof Career Playbook</span></h1>
           <p className="Ws">Answer a few quick questions about your child. Get a personalized, data-backed career strategy with a printable Student Profile you can take to your next college counselor meeting.</p>
           <div className="Wst">
@@ -269,12 +274,12 @@ export default function App() {
           </div>
           <button className="Cb" onClick={() => setStep(1)}>Build My Playbook <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
           <div className="Ww">
-            <div className="Wwi">\u2713 Printable Student Profile & Accomplishment Record</div>
-            <div className="Wwi">\u2713 5 AI-Resistant Career Matches with scores and salaries</div>
-            <div className="Wwi">\u2713 Year-by-Year Action Plan through college</div>
-            <div className="Wwi">\u2713 College Counselor Meeting Prep with 5 tailored questions</div>
+            <div className="Wwi">✓ Printable Student Profile & Accomplishment Record</div>
+            <div className="Wwi">✓ 5 AI-Resistant Career Matches with scores and salaries</div>
+            <div className="Wwi">✓ Year-by-Year Action Plan through college</div>
+            <div className="Wwi">✓ College Counselor Meeting Prep with 5 tailored questions</div>
           </div>
-          <p className="Wf">No login. No email. Completely free.<br/>Built by <strong>Babith Bhoopalan</strong> \u00B7 Quantumleap Insights LLC</p>
+          <p className="Wf">No login. No email. Completely free.<br/>Built by <strong>Babith Bhoopalan</strong> · Quantumleap Insights LLC</p>
         </div>
       </div>}
 
@@ -377,7 +382,7 @@ export default function App() {
         <div className="Rh"><div className="Ri">
           <div>
             <h1 className="Rt">{a.studentName ? `${a.studentName}'s Career Playbook` : "Your Career Playbook"}</h1>
-            <p className="Rsu">{GRADES.find(g => g.id === a.grade)?.label} \u00B7 {a.interests.map(i => INTERESTS.find(x => x.id === i)?.label).join(", ")} \u00B7 {new Date().toLocaleDateString()}</p>
+            <p className="Rsu">{GRADES.find(g => g.id === a.grade)?.label} · {a.interests.map(i => INTERESTS.find(x => x.id === i)?.label).join(", ")} · {new Date().toLocaleDateString()}</p>
           </div>
           <div className="Ra">
             <button className="Bn" onClick={doPrint}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg> Print / Save as PDF</button>
@@ -405,9 +410,9 @@ export default function App() {
           <div className="Rf">
             <h3>Want the full 22-page research behind this playbook?</h3>
             <p>Explore 35+ careers scored for AI resistance. Contribute your perspective and download the complete research document.</p>
-            <a href="https://thriving-shortbread-3bf879.netlify.app" target="_blank" rel="noopener noreferrer" className="Rc">Explore the Full Career Guide \u2192</a>
+            <a href="https://thriving-shortbread-3bf879.netlify.app" target="_blank" rel="noopener noreferrer" className="Rc">Explore the Full Career Guide →</a>
           </div>
-          <p className="Rx">Built by Babith Bhoopalan \u00B7 Quantumleap Insights LLC \u00B7 Research from WEF, Goldman Sachs, McKinsey, PwC, Stanford HAI, Anthropic, and 11 more.</p>
+          <p className="Rx">Built by Babith Bhoopalan · Quantumleap Insights LLC · Research from WEF, Goldman Sachs, McKinsey, PwC, Stanford HAI, Anthropic, and 11 more.</p>
         </div>
       </div>}
 
