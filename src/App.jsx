@@ -106,7 +106,7 @@ function buildPrompt(a) {
   const subjectLabels = a.subjects.map(s => SUBJECTS.find(x => x.id === s)?.label).join(", ");
   const interestLabels = a.interests.map(i => INTERESTS.find(x => x.id === i)?.label).join(", ");
 
-  return `You are a career strategist. Return ONLY valid JSON, no markdown, no backticks, no preamble.
+  return `You are a career strategist. You MUST return ONLY a valid JSON object. No markdown. No backticks. No text before or after the JSON. Start with { and end with }. Keep all string values short (under 150 characters each). Do not use special characters or line breaks inside JSON string values.
 
 STUDENT: Grade: ${a.grade}, Interests: ${interestLabels}, Priority: ${a.priority}, Tech: ${a.techComfort}, Concern: ${concernLabel}, Subjects: ${subjectLabels}, Activities: ${a.activities || "None"}, Accomplishments: ${a.accomplishments || "None"}${a.specificCareer ? ", Considering: " + a.specificCareer : ""}${a.extraContext ? ", Context: " + a.extraContext : ""}
 
@@ -267,12 +267,35 @@ export default function App() {
     return true;
   };
 
+  // Attempt to repair truncated or malformed JSON
+  const repairJSON = (str) => {
+    let s = str.trim();
+    // Remove markdown fencing
+    s = s.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/, "").trim();
+    // Try parsing as-is first
+    try { return JSON.parse(s); } catch {}
+    // Fix common issues: trailing commas before ] or }
+    s = s.replace(/,\s*([\]}])/g, "$1");
+    try { return JSON.parse(s); } catch {}
+    // If truncated, try to close open brackets/braces
+    let opens = 0, openb = 0;
+    for (const ch of s) { if (ch === "[") opens++; if (ch === "]") opens--; if (ch === "{") openb++; if (ch === "}") openb--; }
+    // Remove any trailing partial string/value
+    s = s.replace(/,\s*"[^"]*$/, "");  // remove trailing incomplete key
+    s = s.replace(/,\s*$/, "");  // remove trailing comma
+    for (let i = 0; i < opens; i++) s += "]";
+    for (let i = 0; i < openb; i++) s += "}";
+    s = s.replace(/,\s*([\]}])/g, "$1");
+    try { return JSON.parse(s); } catch {}
+    return null;
+  };
+
   const generate = async () => {
     setStep(10); setLoading(true); setError("");
     try {
       const res = await fetch("/api/generate", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 2000, messages: [{ role: "user", content: buildPrompt(a) }] }),
+        body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 3000, messages: [{ role: "user", content: buildPrompt(a) }] }),
       });
       const data = await res.json();
       if (data.error) {
@@ -280,9 +303,11 @@ export default function App() {
         setStep(11); setLoading(false); return;
       }
       const txt = data.content?.filter(b => b.type === "text").map(b => b.text).join("") || "";
-      // Parse JSON response - strip any markdown fencing
-      const clean = txt.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
-      const parsed = JSON.parse(clean);
+      const parsed = repairJSON(txt);
+      if (!parsed) {
+        setError("Could not parse the playbook data. Please try again.");
+        setStep(11); setLoading(false); return;
+      }
       setProgress(100);
       setTimeout(() => { setPb(parsed); setStep(11); setLoading(false); }, 400);
     } catch (err) {
