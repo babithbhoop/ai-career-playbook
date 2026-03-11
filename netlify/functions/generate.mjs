@@ -1,12 +1,21 @@
 export default async (req, context) => {
   if (req.method !== "POST") {
-    return new Response("Method not allowed", { status: 405 });
+    return new Response(JSON.stringify({ error: "Method not allowed" }), { 
+      status: 405, 
+      headers: { "Content-Type": "application/json" } 
+    });
   }
 
-  const apiKey = Netlify.env.get("ANTHROPIC_API_KEY");
+  let apiKey;
+  try {
+    apiKey = Netlify.env.get("ANTHROPIC_API_KEY");
+  } catch {
+    apiKey = process.env.ANTHROPIC_API_KEY;
+  }
+
   if (!apiKey) {
     return new Response(
-      JSON.stringify({ error: "API key not configured. Set ANTHROPIC_API_KEY in Netlify environment variables." }),
+      JSON.stringify({ error: { message: "API key not configured. Set ANTHROPIC_API_KEY in Netlify environment variables." } }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
@@ -31,12 +40,12 @@ export default async (req, context) => {
     const data = await response.json();
 
     return new Response(JSON.stringify(data), {
-      status: 200,
+      status: response.status,
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
     return new Response(
-      JSON.stringify({ error: err.message }),
+      JSON.stringify({ error: { message: "Function error: " + err.message } }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
