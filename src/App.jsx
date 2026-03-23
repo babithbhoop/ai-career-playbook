@@ -76,6 +76,39 @@ const SUBJECTS = [
   { id: "arts", label: "Arts / Music" }, { id: "sports", label: "Sports / Physical Ed" },
 ];
 
+// Keyword map: subject id → words that signal it
+const SUBJECT_KEYWORDS = {
+  math: ["math","algebra","calculus","geometry","statistics","stats","trigonometry","trig","numbers","equations","precalc","quantitative"],
+  english: ["english","writing","essay","literature","lit","reading","poetry","grammar","language arts","journalism","creative writing","stories","books","novel","composition"],
+  sciences: ["science","biology","bio","chemistry","chem","physics","anatomy","ecology","earth science","environmental","lab","research","scientific","medicine","health","nursing"],
+  history: ["history","social studies","economics","econ","government","politics","political","civics","geography","world history","us history","psychology","psych","sociology","anthropology","culture"],
+  languages: ["spanish","french","german","chinese","mandarin","japanese","latin","arabic","korean","italian","foreign language","language","linguistic"],
+  cs: ["computer","coding","programming","code","software","technology","tech","ai","machine learning","robotics","engineering","web","app","python","javascript","java","stem","data"],
+  arts: ["art","music","drawing","painting","theater","drama","film","photography","design","dance","visual","creative","sculpt","choir","band","orchestra","perform","studio"],
+  sports: ["sports","fitness","physical","gym","athletic","exercise","health","nutrition","coaching","pe","football","basketball","soccer","swimming","track","running","baseball"],
+};
+
+function parseSubjectsFromText(text) {
+  const lower = text.toLowerCase();
+  const matched = [];
+  for (const [id, keywords] of Object.entries(SUBJECT_KEYWORDS)) {
+    if (keywords.some(kw => lower.includes(kw))) matched.push(id);
+  }
+  return matched.length > 0 ? matched : ["english"]; // fallback so prompt always has something
+}
+
+function isGibberish(text) {
+  const t = text.trim();
+  if (t.length < 10) return "Please share a bit more — describe at least one subject or area of interest.";
+  const nonAlpha = (t.match(/[^a-zA-Z\s.,!?'\-]/g) || []).length;
+  if (nonAlpha / t.length > 0.3) return "That doesn't look like a real answer. Describe subjects or interests in plain English.";
+  const words = t.split(/\s+/).filter(w => w.length >= 3);
+  if (words.length < 2) return "Please use a few words to describe what subjects or topics interest you most.";
+  const realWords = words.filter(w => /^[a-zA-Z]{3,}/.test(w));
+  if (realWords.length < 2) return "That looks like random characters. Please describe subjects or topics in plain English.";
+  return null;
+}
+
 // Full career database embedded in client (not sent to Claude)
 const CAREER_DB = {
   "Mental Health Counselor": { score: 98, growth: "22%", salary: "$48,520", sector: "Healthcare", superpower: "Emotional Intelligence" },
@@ -124,7 +157,7 @@ const TOTAL_STEPS = 9;
    ================================================================ */
 function buildPrompt(a) {
   const concernLabel = CONCERNS.find(c => c.id === a.concern)?.label || a.concern;
-  const subjectLabels = a.subjects.map(s => SUBJECTS.find(x => x.id === s)?.label).join(", ");
+  const subjectLabels = a.subjectText || a.subjects.map(s => SUBJECTS.find(x => x.id === s)?.label).join(", ");
   const interestLabels = a.interests.map(i => INTERESTS.find(x => x.id === i)?.label).join(", ");
 
   return `Return ONLY valid JSON. No markdown. No backticks. Start with { end with }. All strings under 80 chars. No special characters in values.
@@ -462,6 +495,214 @@ function FeatureRequestForm({ studentGrade }) {
   );
 }
 
+
+/* ================================================================
+   VOICE COMPONENTS — Web Speech API (free, no key, works in Chrome/Edge/Safari)
+   VoiceCapture: free-text steps — streams transcript live into textarea
+   VoiceSelect:  choice steps — listens, matches spoken answer to an option
+   ================================================================ */
+
+function useSpeechRecognition() {
+  const supported = typeof window !== "undefined" &&
+    ("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
+  const create = () => {
+    if (!supported) return null;
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const r = new SR();
+    r.continuous = true;
+    r.interimResults = true;
+    r.lang = "en-US";
+    return r;
+  };
+  return { supported, create };
+}
+
+function MicIcon({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+      <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+      <line x1="12" y1="19" x2="12" y2="23"/>
+      <line x1="8" y1="23" x2="16" y2="23"/>
+    </svg>
+  );
+}
+
+// Free-text steps: streams live transcript into the field as the family talks
+function VoiceCapture({ onTranscript }) {
+  const [state, setState] = useState("idle"); // idle | listening | done | unsupported
+  const [interim, setInterim] = useState("");
+  const recogRef = useRef(null);
+  const finalRef = useRef("");
+  const { supported, create } = useSpeechRecognition();
+
+  const start = () => {
+    if (!supported) { setState("unsupported"); return; }
+    const recog = create();
+    finalRef.current = "";
+    recog.onstart = () => setState("listening");
+    recog.onresult = (e) => {
+      let interimText = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript;
+        if (e.results[i].isFinal) {
+          finalRef.current += (finalRef.current ? " " : "") + t.trim();
+          onTranscript(finalRef.current);
+        } else {
+          interimText += t;
+        }
+      }
+      setInterim(interimText);
+    };
+    recog.onerror = (e) => { if (e.error !== "no-speech") setState("idle"); };
+    recog.onend = () => {
+      setInterim("");
+      setState(finalRef.current.length > 0 ? "done" : "idle");
+    };
+    recogRef.current = recog;
+    recog.start();
+  };
+
+  const stop = () => recogRef.current?.stop();
+
+  const reset = () => {
+    recogRef.current?.stop();
+    finalRef.current = "";
+    setState("idle");
+    setInterim("");
+    onTranscript("");
+  };
+
+  if (!supported) return null;
+
+  return (
+    <div className="vcWrap">
+      {state === "idle" && (
+        <button className="vcBtn idle" onClick={start}>
+          <MicIcon /> <span>Tap to speak — have a family conversation</span>
+        </button>
+      )}
+      {state === "listening" && (
+        <div className="vcListening">
+          <button className="vcBtn active" onClick={stop}>
+            <span className="vcPulse"/><MicIcon /><span>Listening… tap to stop</span>
+          </button>
+          {interim && <div className="vcInterim">"{interim}"</div>}
+        </div>
+      )}
+      {state === "done" && (
+        <div className="vcDone">
+          <span className="vcDoneIcon">✓</span>
+          <span className="vcDoneText">Captured — edit above if needed</span>
+          <button className="vcRedo" onClick={reset}>Re-record</button>
+        </div>
+      )}
+      {state === "unsupported" && (
+        <div className="vcUnsupported">Voice input requires Chrome or Edge.</div>
+      )}
+    </div>
+  );
+}
+
+// Choice steps: listens until stopped, then matches spoken words to the closest option
+function VoiceSelect({ options, onSelect, matchKey = "label" }) {
+  const [state, setState] = useState("idle"); // idle | listening | matched | nomatch | unsupported
+  const [interim, setInterim] = useState("");
+  const [matched, setMatched] = useState(null);
+  const [errMsg, setErrMsg] = useState("");
+  const recogRef = useRef(null);
+  const finalRef = useRef("");
+  const { supported, create } = useSpeechRecognition();
+
+  const findBestMatch = (text) => {
+    const lower = text.toLowerCase();
+    let found = options.find(o => lower.includes(o[matchKey].toLowerCase()));
+    if (!found) {
+      found = options.find(o => {
+        const words = o[matchKey].toLowerCase().split(/\s+/);
+        return words.some(w => w.length > 3 && lower.includes(w));
+      });
+    }
+    return found || null;
+  };
+
+  const start = () => {
+    if (!supported) { setState("unsupported"); return; }
+    const recog = create();
+    finalRef.current = "";
+    setInterim(""); setMatched(null); setErrMsg("");
+    recog.onstart = () => setState("listening");
+    recog.onresult = (e) => {
+      let interimText = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript;
+        if (e.results[i].isFinal) {
+          finalRef.current += (finalRef.current ? " " : "") + t.trim();
+          // Try to match as words come in
+          const match = findBestMatch(finalRef.current);
+          if (match) {
+            recog.stop();
+            setMatched(match);
+            onSelect(match.id);
+            setState("matched");
+            return;
+          }
+        } else {
+          interimText += t;
+        }
+      }
+      setInterim(interimText);
+    };
+    recog.onerror = (e) => { if (e.error !== "no-speech") setState("idle"); };
+    recog.onend = () => {
+      setInterim("");
+      if (state === "matched") return;
+      if (finalRef.current) {
+        const match = findBestMatch(finalRef.current);
+        if (match) { setMatched(match); onSelect(match.id); setState("matched"); }
+        else { setErrMsg(`Heard "${finalRef.current}" — no match. Tap an option above.`); setState("nomatch"); }
+      } else {
+        setState("idle");
+      }
+    };
+    recogRef.current = recog;
+    recog.start();
+  };
+
+  const stop = () => recogRef.current?.stop();
+  const reset = () => { recogRef.current?.stop(); finalRef.current = ""; setState("idle"); setMatched(null); setErrMsg(""); setInterim(""); };
+
+  if (!supported) return null;
+
+  return (
+    <div className="vcWrap">
+      {state === "idle" && (
+        <button className="vcBtn idle" onClick={start}>
+          <MicIcon /> <span>Or speak your answer</span>
+        </button>
+      )}
+      {state === "listening" && (
+        <div className="vcListening">
+          <button className="vcBtn active" onClick={stop}>
+            <span className="vcPulse"/><MicIcon /><span>Listening… tap to stop</span>
+          </button>
+          {interim && <div className="vcInterim">"{interim}"</div>}
+        </div>
+      )}
+      {state === "matched" && matched && (
+        <div className="vcDone">
+          <span className="vcDoneIcon">✓</span>
+          <span className="vcDoneText">Selected: <strong>{matched[matchKey]}</strong></span>
+          <button className="vcRedo" onClick={reset}>Re-record</button>
+        </div>
+      )}
+      {state === "nomatch" && (
+        <div className="vcError"><span>⚠ {errMsg}</span><button className="vcRedo" onClick={reset}>Try again</button></div>
+      )}
+    </div>
+  );
+}
+
 /* ================================================================
    MAIN APP
    ================================================================ */
@@ -469,7 +710,7 @@ export default function App() {
   const [step, setStep] = useState(0);
   const [a, setA] = useState({
     grade: "", interests: [], priority: "", techComfort: "", concern: "",
-    subjects: [], activities: "", accomplishments: "",
+    subjects: [], subjectText: "", activities: "", accomplishments: "",
     specificCareer: "", extraContext: "", studentName: "",
   });
   const [pb, setPb] = useState(null); // parsed playbook JSON
@@ -489,7 +730,17 @@ export default function App() {
 
   const set = (k, v) => setA(p => ({ ...p, [k]: v }));
   const toggleInt = (id) => setA(p => ({ ...p, interests: p.interests.includes(id) ? p.interests.filter(x => x !== id) : p.interests.length < 3 ? [...p.interests, id] : p.interests }));
-  const toggleSub = (id) => setA(p => ({ ...p, subjects: p.subjects.includes(id) ? p.subjects.filter(x => x !== id) : p.subjects.length < 4 ? [...p.subjects, id] : p.subjects }));
+  const [subjectErr, setSubjectErr] = useState("");
+  const handleSubjectText = (text) => {
+    set("subjectText", text);
+    if (text.length > 5) {
+      const err = isGibberish(text);
+      setSubjectErr(err || "");
+      if (!err) set("subjects", parseSubjectsFromText(text));
+    } else {
+      setSubjectErr("");
+    }
+  };
 
   const ok = () => {
     if (step === 1) return a.grade !== "";
@@ -497,7 +748,7 @@ export default function App() {
     if (step === 3) return a.priority !== "";
     if (step === 4) return a.techComfort !== "";
     if (step === 5) return a.concern !== "";
-    if (step === 6) return a.subjects.length >= 1;
+    if (step === 6) return a.subjectText.trim().length >= 10 && !isGibberish(a.subjectText);
     return true;
   };
 
@@ -590,11 +841,11 @@ export default function App() {
     }
   };
 
-  const restart = () => { setStep(0); setA({ grade: "", interests: [], priority: "", techComfort: "", concern: "", subjects: [], activities: "", accomplishments: "", specificCareer: "", extraContext: "", studentName: "" }); setPb(null); setError(""); };
+  const restart = () => { setStep(0); setA({ grade: "", interests: [], priority: "", techComfort: "", concern: "", subjects: [], subjectText: "", activities: "", accomplishments: "", specificCareer: "", extraContext: "", studentName: "" }); setPb(null); setError(""); };
 
   const gradeLabel = GRADES.find(g => g.id === a.grade)?.label || "";
   const interestLabels = a.interests.map(i => INTERESTS.find(x => x.id === i)?.label).join(", ");
-  const subjectLabels = a.subjects.map(s => SUBJECTS.find(x => x.id === s)?.label).join(", ");
+  const subjectLabels = a.subjectText || a.subjects.map(s => SUBJECTS.find(x => x.id === s)?.label).join(", ");
   const priorityLabel = PRIORITIES.find(p => p.id === a.priority)?.label || "";
   const progressPct = step >= 1 && step <= 9 ? (step / TOTAL_STEPS) * 100 : 0;
 
@@ -641,48 +892,73 @@ export default function App() {
 
           {step === 1 && <div className="Q"><div className="Qn">01</div><h2 className="Qt">What grade is your child in?</h2><p className="Qd">This determines the timeline for your action plan.</p>
             <div className="Ol">{GRADES.map(g => <button key={g.id} className={`Ob ${a.grade === g.id ? "s" : ""}`} onClick={() => set("grade", g.id)}><span className="Or">{a.grade === g.id ? "◉" : "○"}</span>{g.label}</button>)}</div>
+            <VoiceSelect options={GRADES} onSelect={(id) => set("grade", id)} currentValue={a.grade} />
           </div>}
 
-          {step === 2 && <div className="Q"><div className="Qn">02</div><h2 className="Qt">What are their top interests?</h2><p className="Qd">Pick up to 3 areas. We will find careers at the intersection.</p>
+          {step === 2 && <div className="Q"><div className="Qn">02</div><h2 className="Qt">What are their top interests?</h2><p className="Qd">Pick up to 3 areas, or speak them — say something like "healthcare and technology".</p>
             <div className="Ig">{INTERESTS.map(o => <button key={o.id} className={`Ic ${a.interests.includes(o.id) ? "s" : ""}`} onClick={() => toggleInt(o.id)}>
               <span className="Ii">{o.ico}</span><span className="Il">{o.label}</span><span className="Ie">{o.ex}</span>
               {a.interests.includes(o.id) && <span className="Ik">✓</span>}
             </button>)}</div>
             <p className="Qh">{a.interests.length}/3 selected</p>
+            <VoiceSelect options={INTERESTS} onSelect={(id) => toggleInt(id)} currentValue={a.interests} matchKey="label" />
           </div>}
 
-          {step === 3 && <div className="Q"><div className="Qn">03</div><h2 className="Qt">What matters most for their career?</h2><p className="Qd">Pick the single most important factor.</p>
+          {step === 3 && <div className="Q"><div className="Qn">03</div><h2 className="Qt">What matters most for their career?</h2><p className="Qd">Pick the single most important factor, or say it — "job security" or "earning potential".</p>
             <div className="Ol">{PRIORITIES.map(p => <button key={p.id} className={`Ob hd ${a.priority === p.id ? "s" : ""}`} onClick={() => set("priority", p.id)}>
               <span className="Or">{a.priority === p.id ? "◉" : "○"}</span><div><div className="Om">{p.label}</div><div className="Od">{p.desc}</div></div>
             </button>)}</div>
+            <VoiceSelect options={PRIORITIES} onSelect={(id) => set("priority", id)} currentValue={a.priority} />
           </div>}
 
-          {step === 4 && <div className="Q"><div className="Qn">04</div><h2 className="Qt">How does your child feel about technology?</h2><p className="Qd">This shapes how we integrate AI fluency into their path.</p>
+          {step === 4 && <div className="Q"><div className="Qn">04</div><h2 className="Qt">How does your child feel about technology?</h2><p className="Qd">This shapes how we integrate AI fluency into their path. Or just say it — "loves technology" or "prefers hands-on".</p>
             <div className="Ol">{TECHC.map(t => <button key={t.id} className={`Ob hd ${a.techComfort === t.id ? "s" : ""}`} onClick={() => set("techComfort", t.id)}>
               <span className="Or">{a.techComfort === t.id ? "◉" : "○"}</span><div><div className="Om">{t.label}</div><div className="Od">{t.desc}</div></div>
             </button>)}</div>
+            <VoiceSelect options={TECHC} onSelect={(id) => set("techComfort", id)} currentValue={a.techComfort} />
           </div>}
 
-          {step === 5 && <div className="Q"><div className="Qn">05</div><h2 className="Qt">What is your biggest career concern?</h2><p className="Qd">Your playbook will address this head-on with data.</p>
+          {step === 5 && <div className="Q"><div className="Qn">05</div><h2 className="Qt">What is your biggest career concern?</h2><p className="Qd">Your playbook will address this head-on with data. Or just say it — "AI replacing jobs" or "college debt".</p>
             <div className="Ol">{CONCERNS.map(c => <button key={c.id} className={`Ob ${a.concern === c.id ? "s" : ""}`} onClick={() => set("concern", c.id)}>
               <span className="Or">{a.concern === c.id ? "◉" : "○"}</span>{c.label}
             </button>)}</div>
+            <VoiceSelect options={CONCERNS} onSelect={(id) => set("concern", id)} currentValue={a.concern} />
           </div>}
 
-          {step === 6 && <div className="Q"><div className="Qn">06</div><h2 className="Qt">What are their strongest subjects?</h2><p className="Qd">Pick up to 4. We will connect academic strengths to career paths.</p>
-            <div className="Sg">{SUBJECTS.map(s => <button key={s.id} className={`Sc ${a.subjects.includes(s.id) ? "s" : ""}`} onClick={() => toggleSub(s.id)}>
-              {a.subjects.includes(s.id) && <span className="Sk">✓</span>}{s.label}
-            </button>)}</div>
-            <p className="Qh">{a.subjects.length}/4 selected</p>
+          {step === 6 && <div className="Q"><div className="Qn">06</div>
+            <h2 className="Qt">What subjects or topics genuinely excite them?</h2>
+            <p className="Qd">Write it however feels natural. "She loves biology and can't stop reading about genetics" is perfect. So is "he's really into coding and building things." We'll figure out the rest.</p>
+            <textarea
+              className={`Ta subjectTa ${subjectErr ? "err" : a.subjectText.length > 10 && !isGibberish(a.subjectText) ? "ok" : ""}`}
+              placeholder={"Try something like:\n\u2022 She lights up in chemistry, loves science\n\u2022 Obsessed with coding, built apps already\n\u2022 Strong in writing and history, hates math\n\u2022 Loves performing arts and music"}
+              value={a.subjectText}
+              onChange={e => handleSubjectText(e.target.value)}
+              rows={5}
+              maxLength={500}
+            />
+            {subjectErr && <div className="subjectErrBox"><span className="subjectErrIcon">⚠</span>{subjectErr}</div>}
+            {!subjectErr && a.subjectText.length > 10 && parseSubjectsFromText(a.subjectText).length > 0 && (
+              <div className="subjectDetected">
+                <span className="subjectDetectedLabel">Detected: </span>
+                {parseSubjectsFromText(a.subjectText).map(id => SUBJECTS.find(s => s.id === id)?.label).filter(Boolean).join(" · ")}
+              </div>
+            )}
+            {!subjectErr && a.subjectText.length > 10 && parseSubjectsFromText(a.subjectText).length === 0 && (
+              <div className="subjectHint">Keep going — mention a specific subject, topic, or activity and we'll connect it to career paths.</div>
+            )}
+            <VoiceCapture onTranscript={(text, final) => { if (text) handleSubjectText(text); }} />
+            <p className="Qh2">{a.subjectText.length}/500 characters</p>
           </div>}
 
-          {step === 7 && <div className="Q"><div className="Qn">07</div><h2 className="Qt">What extracurriculars and activities are they involved in?</h2><p className="Qd">List everything: clubs, sports, volunteering, jobs, hobbies, music. We will show how these connect to AI-resistant careers.</p>
+          {step === 7 && <div className="Q"><div className="Qn">07</div><h2 className="Qt">What extracurriculars and activities are they involved in?</h2><p className="Qd">List everything: clubs, sports, volunteering, jobs, hobbies, music. Or tap the mic and just talk — we'll capture it all.</p>
             <textarea className="Ta" placeholder="e.g. Varsity soccer (3 years), robotics club president, volunteers at animal shelter, plays guitar, summer job at vet clinic, debate team..." value={a.activities} onChange={e => set("activities", e.target.value)} rows={4}/>
+            <VoiceCapture onTranscript={(text, final) => { if (text) set("activities", text); }} />
             <p className="Qh2">The more you share, the more personalized your playbook will be</p>
           </div>}
 
-          {step === 8 && <div className="Q"><div className="Qn">08</div><h2 className="Qt">Any accomplishments, awards, or milestones?</h2><p className="Qd">These will appear in your printable Brag Sheet for the counselor meeting.</p>
+          {step === 8 && <div className="Q"><div className="Qn">08</div><h2 className="Qt">Any accomplishments, awards, or milestones?</h2><p className="Qd">These will appear in your printable Brag Sheet. Ask your child directly — tap the mic and let them tell you.</p>
             <textarea className="Ta" placeholder="e.g. Honor roll 3 semesters, won regional science fair (2nd place), Eagle Scout, AP Scholar, speaks conversational Spanish, built an app for school project..." value={a.accomplishments} onChange={e => set("accomplishments", e.target.value)} rows={4}/>
+            <VoiceCapture onTranscript={(text, final) => { if (text) set("accomplishments", text); }} />
             <p className="Qh2">Don't be modest. Everything counts.</p>
           </div>}
 
@@ -696,6 +972,7 @@ export default function App() {
               </label>
               <label className="Fl">Anything else? (strengths, challenges, financial situation)
                 <textarea className="Ta2" placeholder="e.g. Great at math but shy. Has ADHD, thrives hands-on. First-gen college student..." value={a.extraContext} onChange={e => set("extraContext", e.target.value)} rows={3}/>
+                <VoiceCapture onTranscript={(text, final) => { if (text) set("extraContext", text); }} />
               </label>
             </div>
           </div>}
@@ -1132,6 +1409,16 @@ export default function App() {
 .Ik{position:absolute;top:8px;right:10px;width:22px;height:22px;background:var(--blue);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;font-weight:700}
 
 .Sg{display:flex;flex-wrap:wrap;gap:8px}
+.subjectTa{width:100%;padding:16px 18px;background:rgba(255,255,255,.03);border:1px solid var(--border-mid);border-radius:8px;color:var(--text);font-size:15px;font-family:'Inter',sans-serif;outline:none;transition:border-color .2s,box-shadow .2s;resize:vertical;min-height:130px;line-height:1.7}
+.subjectTa:focus{border-color:rgba(37,99,235,.5)}
+.subjectTa.err{border-color:rgba(239,68,68,.6);box-shadow:0 0 0 3px rgba(239,68,68,.08)}
+.subjectTa.ok{border-color:rgba(37,99,235,.5);box-shadow:0 0 0 3px rgba(37,99,235,.08)}
+.subjectTa::placeholder{color:var(--text-dim);font-size:13px;line-height:1.6}
+.subjectErrBox{display:flex;align-items:flex-start;gap:8px;margin-top:10px;padding:12px 14px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:8px;font-size:13px;color:#fca5a5;line-height:1.5;animation:fiu .2s ease}
+.subjectErrIcon{flex-shrink:0;font-size:15px}
+.subjectDetected{margin-top:10px;padding:10px 14px;background:rgba(37,99,235,.07);border:1px solid rgba(37,99,235,.2);border-radius:8px;font-size:12px;color:#93c5fd;font-family:'DM Mono',monospace;animation:fiu .2s ease}
+.subjectDetectedLabel{color:var(--text-dim);margin-right:4px}
+.subjectHint{margin-top:10px;font-size:13px;color:var(--text-dim);font-style:italic}
 .Sc{padding:12px 20px;background:rgba(255,255,255,.02);border:1px solid var(--border-mid);border-radius:6px;color:var(--text-muted);font-size:14px;cursor:pointer;font-family:'Inter',sans-serif;transition:all .2s;display:flex;align-items:center;gap:8px}
 .Sc:hover{border-color:rgba(37,99,235,.35)}.Sc.s{border-color:var(--blue);background:rgba(37,99,235,.08);color:var(--text)}
 .Sk{color:var(--blue);font-weight:700;font-size:13px}
@@ -1355,6 +1642,21 @@ export default function App() {
 .frSuccessBtn{margin-top:8px;padding:10px 24px;background:var(--blue);color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif}
 @media(max-width:600px){.frRow{grid-template-columns:1fr}.frTeaser{flex-direction:column;align-items:flex-start}.frActions{flex-direction:column}.frSubmit,.frCancel{width:100%;text-align:center}}
 
+
+/* Voice Capture */
+.vcWrap{margin-top:12px}
+.vcBtn{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border:1px solid var(--border-mid);border-radius:24px;background:rgba(255,255,255,.03);color:var(--text-muted);font-size:13px;font-family:'Inter',sans-serif;cursor:pointer;transition:all .2s}
+.vcBtn.idle:hover{border-color:rgba(37,99,235,.4);color:var(--text);background:rgba(37,99,235,.06)}
+.vcBtn.active{border-color:rgba(239,68,68,.5);background:rgba(239,68,68,.08);color:#fca5a5;animation:vcPulseBtn 1.5s ease-in-out infinite}
+@keyframes vcPulseBtn{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.15)}50%{box-shadow:0 0 0 6px rgba(239,68,68,.04)}}
+.vcPulse{width:8px;height:8px;border-radius:50%;background:#ef4444;flex-shrink:0;animation:vcDot .8s ease-in-out infinite}
+@keyframes vcDot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.7)}}
+.vcDone{display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.2);border-radius:8px;font-size:13px}
+.vcDoneIcon{color:var(--blue);font-size:14px;flex-shrink:0}
+.vcDoneText{color:var(--text-muted);flex:1}
+.vcError{display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.2);border-radius:8px;font-size:13px;color:#fca5a5}
+.vcError span{flex:1}
+.vcRedo{background:none;border:none;color:var(--blue);font-size:12px;cursor:pointer;font-family:'Inter',sans-serif;text-decoration:underline;text-underline-offset:3px;white-space:nowrap}
 /* Animations */
 @keyframes fiu{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
 @keyframes fl{0%,100%{transform:translate(0,0)}50%{transform:translate(30px,-20px)}}
