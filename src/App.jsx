@@ -1,6 +1,27 @@
 import { useState, useEffect, useRef } from "react";
 
 /* ================================================================
+   SUPABASE CONFIG
+   ================================================================ */
+const SUPABASE_URL = "https://acmdvqrbdomvjgyxnwgl.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFjbWR2cXJiZG9tdmpneXhud2dsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMjUxNzcsImV4cCI6MjA4OTgwMTE3N30.124Ur7m3X2RCI6Y9qgViLrCMbrw8u1nmnF7M7eWGm00";
+
+async function submitFeatureRequest(data) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/feature_requests`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": SUPABASE_ANON_KEY,
+      "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+      "Prefer": "return=minimal",
+    },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`Supabase error: ${res.status}`);
+  return true;
+}
+
+/* ================================================================
    STATIC DATA & CAREER DATABASE
    ================================================================ */
 const GRADES = [
@@ -300,6 +321,142 @@ function BragRow({ label, items }) {
             <span style={{ lineHeight: 1.5 }}>{item}</span>
           </div>
         ))
+      )}
+    </div>
+  );
+}
+
+/* ================================================================
+   FEATURE REQUEST FORM COMPONENT
+   ================================================================ */
+function FeatureRequestForm({ studentGrade }) {
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({
+    name: "", email: "", feature_title: "", feature_description: "",
+    use_case: "", priority: "", child_grade: studentGrade || "",
+  });
+  const [status, setStatus] = useState("idle"); // idle | submitting | success | error
+  const [errMsg, setErrMsg] = useState("");
+
+  const setF = (k, v) => setForm(p => ({ ...p, [k]: v }));
+
+  const canSubmit = form.feature_title.trim() && form.feature_description.trim();
+
+  const handleSubmit = async () => {
+    if (!canSubmit) return;
+    setStatus("submitting");
+    try {
+      await submitFeatureRequest({
+        name: form.name || null,
+        email: form.email || null,
+        feature_title: form.feature_title.trim(),
+        feature_description: form.feature_description.trim(),
+        use_case: form.use_case || null,
+        priority: form.priority || null,
+        child_grade: form.child_grade || null,
+        source: "ai-career-playbook",
+      });
+      setStatus("success");
+    } catch (e) {
+      setErrMsg(e.message);
+      setStatus("error");
+    }
+  };
+
+  const reset = () => {
+    setOpen(false);
+    setStatus("idle");
+    setForm({ name: "", email: "", feature_title: "", feature_description: "", use_case: "", priority: "", child_grade: studentGrade || "" });
+    setErrMsg("");
+  };
+
+  return (
+    <div className="frWrap no-print">
+      {!open ? (
+        <div className="frTeaser">
+          <div className="frTeaserText">
+            <div className="frTeaserTitle">Have an idea for this playbook?</div>
+            <div className="frTeaserSub">We build this for parents, with parents. Tell us what would make it more useful for your family.</div>
+          </div>
+          <button className="frOpenBtn" onClick={() => setOpen(true)}>Suggest a Feature →</button>
+        </div>
+      ) : (
+        <div className="frPanel">
+          <div className="frPanelHead">
+            <div>
+              <div className="frPanelTitle">Suggest a Feature</div>
+              <div className="frPanelSub">Every submission is read by Babith personally. Your idea may ship in the next update.</div>
+            </div>
+            <button className="frClose" onClick={reset}>✕</button>
+          </div>
+
+          {status === "success" ? (
+            <div className="frSuccess">
+              <div className="frSuccessIcon">✓</div>
+              <div className="frSuccessTitle">Got it. Thank you.</div>
+              <div className="frSuccessMsg">Your suggestion has been saved. We review every submission and prioritize based on how many parents ask for the same thing. If you left an email, we'll let you know when it ships.</div>
+              <button className="frSuccessBtn" onClick={reset}>Close</button>
+            </div>
+          ) : (
+            <div className="frForm">
+              <div className="frRow">
+                <div className="frField">
+                  <label className="frLabel">Your name <span className="frOpt">(optional)</span></label>
+                  <input className="frInput" type="text" placeholder="e.g. Sarah M." value={form.name} onChange={e => setF("name", e.target.value)} />
+                </div>
+                <div className="frField">
+                  <label className="frLabel">Email <span className="frOpt">(optional — only if you want us to follow up)</span></label>
+                  <input className="frInput" type="email" placeholder="you@email.com" value={form.email} onChange={e => setF("email", e.target.value)} />
+                </div>
+              </div>
+
+              <div className="frField">
+                <label className="frLabel">Feature idea <span className="frReq">*</span></label>
+                <input className="frInput" type="text" placeholder="e.g. Show which colleges have strong programs for AI-resistant careers" value={form.feature_title} onChange={e => setF("feature_title", e.target.value)} maxLength={120} />
+              </div>
+
+              <div className="frField">
+                <label className="frLabel">Tell us more <span className="frReq">*</span></label>
+                <textarea className="frTextarea" placeholder="What problem does this solve for you? What would you do with this feature?" value={form.feature_description} onChange={e => setF("feature_description", e.target.value)} rows={4} />
+              </div>
+
+              <div className="frRow">
+                <div className="frField">
+                  <label className="frLabel">How important is this to you?</label>
+                  <div className="frPills">
+                    {[
+                      { id: "nice_to_have", label: "Nice to have" },
+                      { id: "would_use_often", label: "Would use often" },
+                      { id: "need_this_now", label: "Need this now" },
+                    ].map(p => (
+                      <button key={p.id} className={`frPill ${form.priority === p.id ? "sel" : ""}`} onClick={() => setF("priority", p.id)}>{p.label}</button>
+                    ))}
+                  </div>
+                </div>
+                <div className="frField">
+                  <label className="frLabel">Child's grade <span className="frOpt">(optional)</span></label>
+                  <select className="frSelect" value={form.child_grade} onChange={e => setF("child_grade", e.target.value)}>
+                    <option value="">Select grade</option>
+                    {GRADES.map(g => <option key={g.id} value={g.id}>{g.label}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {status === "error" && <div className="frError">Something went wrong — {errMsg}. Please try again.</div>}
+
+              <div className="frActions">
+                <button className="frCancel" onClick={reset}>Cancel</button>
+                <button
+                  className={`frSubmit ${canSubmit && status !== "submitting" ? "active" : "disabled"}`}
+                  onClick={handleSubmit}
+                  disabled={!canSubmit || status === "submitting"}
+                >
+                  {status === "submitting" ? "Submitting…" : "Submit Suggestion"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
@@ -672,46 +829,106 @@ export default function App() {
             </div>
           </div>
 
-          {/* ---- SECTION 6: Counselor Meeting Kit ---- */}
+          {/* ---- SECTION 6: Counselor Meeting Kit (Rich Version) ---- */}
           <div className="section">
             <h2 className="secTitle">College Counselor Meeting Kit</h2>
-            <p className="secDesc">Walk into your next meeting prepared. Here is your agenda.</p>
+            <p className="secDesc">Walk in prepared. Most counselors manage 300–500 students. The parents who get the most help are the ones who come ready.</p>
             <div className="meetingKit">
+
+              {/* BRING */}
               <div className="mkSection">
-                <div className="mkLabel">📋 BRING TO THE MEETING</div>
+                <div className="mkLabel">📋 What to Bring</div>
                 <div className="mkItems">
-                  <div className="mkItem">✓ This printed playbook with Student Profile</div>
-                  <div className="mkItem">✓ Unofficial transcript / grade report</div>
-                  <div className="mkItem">✓ Printed Brag Sheet (above)</div>
-                  <div className="mkItem">✓ List of colleges you are considering</div>
-                  <div className="mkItem">✓ Any test scores (PSAT, SAT, ACT, AP)</div>
+                  <div className="mkItem">✓ This printed playbook — student profile + career matches on top</div>
+                  <div className="mkItem">✓ Unofficial transcript (counselors need to see the full grade trajectory)</div>
+                  <div className="mkItem">✓ Printed Brag Sheet from above — formatted exactly how they expect it</div>
+                  <div className="mkItem">✓ Any test scores: PSAT, SAT, ACT, AP exam results</div>
+                  <div className="mkItem">✓ A short college list — even 5–10 early ideas shows you're serious</div>
+                  <div className="mkItem">✓ One paragraph about who your child is beyond grades — written in advance</div>
                 </div>
               </div>
+
+              {/* UNDERSTANDING THE STUDENT */}
               <div className="mkSection">
-                <div className="mkLabel">❓ QUESTIONS TO ASK (tailored to {a.studentName || "your child"})</div>
+                <div className="mkLabel">🎓 Questions the Counselor Will Ask You — Be Ready</div>
+                <div className="mkSub">Counselors use the first meeting to build a student profile. Prepare your child for these:</div>
+                <div className="mkItems">
+                  <div className="mkItem question">What subjects do you genuinely enjoy — not just the ones you're good at?</div>
+                  <div className="mkItem question">What do you do outside of school that you'd do even if it wasn't on a college application?</div>
+                  <div className="mkItem question">Is there a college size, location, or campus culture you're drawn to — or want to avoid?</div>
+                  <div className="mkItem question">Have you thought about what you want to study, or does that feel too early to decide?</div>
+                  <div className="mkItem question">What does your family's financial picture look like — are we working with a budget range?</div>
+                  <div className="mkItem question">Are there any learning differences, accommodations, or personal circumstances we should factor in?</div>
+                  <div className="mkItem question">Where do you see yourself in 10 years — even a rough direction helps us think about majors and programs.</div>
+                </div>
+              </div>
+
+              {/* TAILORED QUESTIONS FROM AI */}
+              <div className="mkSection">
+                <div className="mkLabel">❓ Your Questions for the Counselor — Tailored to {a.studentName || "Your Child"}</div>
+                <div className="mkSub">These are smart, informed questions based on the playbook profile. Use them to lead, not just react.</div>
                 <div className="mkItems">
                   {pb.counselorQs?.map((q, i) => <div key={i} className="mkItem question">{i + 1}. {q}</div>)}
+                  <div className="mkItem question">{pb.careers?.[0]?.name ? `Is ${pb.careers[0].name} a path you've seen students pursue successfully? What does that pipeline look like from our high school?` : "What paths have students with similar profiles pursued successfully from our school?"}</div>
+                  <div className="mkItem question">How many college counselor meetings can we expect, and what's the best way to stay in contact between them?</div>
+                  <div className="mkItem question">Will you be writing the counselor recommendation letter? What helps you write a strong one — what do you need to know about my child that isn't on the transcript?</div>
+                  <div className="mkItem question">Can we see the school profile that gets sent to colleges? We want to understand the context our child's application is read in.</div>
+                  <div className="mkItem question">Given where my child is right now, what one thing should they do this semester that would most improve their application?</div>
                 </div>
               </div>
+
+              {/* ACADEMIC PLANNING */}
               <div className="mkSection">
-                <div className="mkLabel">💬 TALKING POINTS ABOUT AI & CAREERS</div>
+                <div className="mkLabel">📚 Academic Planning — What to Settle in This Meeting</div>
+                <div className="mkItems">
+                  <div className="mkItem">→ Is the current course rigor (AP/IB/Honors) appropriate for the target schools? What should change next year?</div>
+                  <div className="mkItem">→ What is the school's policy on Ds or Ws on the transcript — and are there any red flags to address now?</div>
+                  <div className="mkItem">→ SAT or ACT — which does this counselor recommend for this student's profile? When should they test?</div>
+                  <div className="mkItem">→ Are there AP exams worth taking even without the class, given the career direction?</div>
+                  <div className="mkItem">→ What's the strongest senior year schedule that doesn't cause burnout before applications are due?</div>
+                </div>
+              </div>
+
+              {/* AI & CAREERS TALKING POINTS */}
+              <div className="mkSection">
+                <div className="mkLabel">💬 Talking Points — AI & Career Planning</div>
+                <div className="mkSub">Most counselors haven't had this conversation with parents yet. Lead it confidently.</div>
                 <div className="mkItems">
                   {pb.talkingPoints?.map((tp, i) => <div key={i} className="mkItem tp">→ {tp}</div>)}
+                  <div className="mkItem tp">→ WEF projects 170M new jobs by 2030 alongside 92M displaced — net positive, but the new jobs require different preparation than we've historically focused on.</div>
+                  <div className="mkItem tp">→ PwC found a 56% wage premium for AI-fluent workers in every industry — this isn't just a tech story, it applies to healthcare, law, education, and the trades.</div>
+                  <div className="mkItem tp">→ We're not trying to predict the future — we're building a student who can adapt to whatever it brings.</div>
                 </div>
               </div>
+
+              {/* RECOMMENDATION LETTER */}
               <div className="mkSection">
-                <div className="mkLabel">📝 AFTER THE MEETING</div>
+                <div className="mkLabel">✉️ Recommendation Letter Strategy</div>
                 <div className="mkItems">
-                  <div className="mkItem">□ Send thank-you email to counselor within 24 hours</div>
-                  <div className="mkItem">□ Update brag sheet with any new recommendations</div>
-                  <div className="mkItem">□ Schedule follow-up meeting for next semester</div>
-                  <div className="mkItem">□ Share playbook with your partner/co-parent</div>
+                  <div className="mkItem">→ Ask explicitly: "What information can we give you so the letter feels personal, not generic?"</div>
+                  <div className="mkItem">→ Offer to complete a parent questionnaire if the counselor provides one — fill it in specific stories, not adjectives.</div>
+                  <div className="mkItem">→ Identify 2–3 teacher recommenders now, even if the ask is months away. Relationships take time.</div>
+                  <div className="mkItem">→ Ask how far in advance they need the recommendation request — many counselors need 6–8 weeks minimum.</div>
                 </div>
               </div>
+
+              {/* AFTER */}
+              <div className="mkSection">
+                <div className="mkLabel">📝 After the Meeting — Within 48 Hours</div>
+                <div className="mkItems">
+                  <div className="mkItem">□ Send a brief thank-you email — include your child's name and one thing you appreciated from the conversation</div>
+                  <div className="mkItem">□ Write down the 3 most important action items the counselor gave you before you forget</div>
+                  <div className="mkItem">□ Update the Brag Sheet with any accomplishments or activities the counselor suggested highlighting</div>
+                  <div className="mkItem">□ Book the next meeting before you leave or within 24 hours — don't let scheduling drift</div>
+                  <div className="mkItem">□ Share the key takeaways with your child — frame it as "here's what we learned" not "here's what you need to do"</div>
+                  <div className="mkItem">□ Share this playbook with your co-parent or partner so you're aligned on next steps</div>
+                </div>
+              </div>
+
             </div>
           </div>
 
-          {/* ---- SECTION 7: Concern + 56% Rule ---- */}
+          {/* ---- SECTION 7: Concern + Parent as the Ally Model + 56% Rule ---- */}
           {pb.concernResponse && <div className="section">
             <h2 className="secTitle">Addressing Your Concern</h2>
             <div className="concernBox">
@@ -723,6 +940,110 @@ export default function App() {
               </div>
             </div>
           </div>}
+
+          {/* ---- PARENT AS THE ALLY MODEL ---- */}
+          <div className="section">
+            <div className="allyBox">
+              <div className="allyHeader">
+                <div className="allyIcon">◈</div>
+                <div>
+                  <div className="allyTitle">The Parent as the Ally Model</div>
+                  <div className="allySub">Your role isn't to manage the process — it's to make your child capable of managing it themselves. Here's the roadmap by phase.</div>
+                </div>
+              </div>
+
+              <div className="allyPhases">
+
+                <div className="allyPhase">
+                  <div className="allyPhaseHead">
+                    <span className="allyPhaseTag">Now → End of This School Year</span>
+                    <span className="allyPhaseName">Foundation Phase — Plant the Seeds</span>
+                  </div>
+                  <div className="allyPhaseItems">
+                    <div className="allyItem"><span className="allyDot"/>Have one honest conversation about AI and careers — share this playbook as a starting point, not a directive. The goal is curiosity, not pressure.</div>
+                    <div className="allyItem"><span className="allyDot"/>Help them build a simple "accomplishments log" — a running Google Doc where they note anything worth remembering: awards, projects, volunteer hours, moments of pride. This becomes the brag sheet.</div>
+                    <div className="allyItem"><span className="allyDot"/>Research the top 2–3 career matches together. Spend 30 minutes finding one person on LinkedIn who does that job. Read their path. Make it real.</div>
+                    <div className="allyItem"><span className="allyDot"/>Get clarity on your family's financial parameters. Have the honest money conversation now — before your child falls in love with a school. Know your FAFSA situation and roughly what you can afford.</div>
+                    <div className="allyItem"><span className="allyDot"/>Establish your role explicitly: "I'm here to help you think, not to do this for you." Research consistently shows students whose parents support without controlling have better outcomes and less anxiety.</div>
+                  </div>
+                </div>
+
+                <div className="allyPhase">
+                  <div className="allyPhaseHead">
+                    <span className="allyPhaseTag">This Summer</span>
+                    <span className="allyPhaseName">Exploration Phase — Build Real Exposure</span>
+                  </div>
+                  <div className="allyPhaseItems">
+                    <div className="allyItem"><span className="allyDot"/>Help them find one summer experience connected to their top career match — a volunteer role, shadow opportunity, summer program, or part-time job. The experience matters less than the reflection it creates.</div>
+                    <div className="allyItem"><span className="allyDot"/>Plan 2–3 college visits — even informally. Walking a campus does something a website cannot. Mix sizes: one large research university, one mid-size, one small. The contrast is instructive.</div>
+                    <div className="allyItem"><span className="allyDot"/>Encourage them to start a "college notes" doc — impressions from each visit, what felt right, what didn't. Their instincts matter and this data gets useful later.</div>
+                    <div className="allyItem"><span className="allyDot"/>Introduce them to one professional in a field they're considering. This doesn't require connections — a LinkedIn message to a local professional with a specific question gets a reply more often than you'd think.</div>
+                  </div>
+                </div>
+
+                <div className="allyPhase">
+                  <div className="allyPhaseHead">
+                    <span className="allyPhaseTag">Junior Year — Fall Semester</span>
+                    <span className="allyPhaseName">Strategy Phase — Get Serious Without Panic</span>
+                  </div>
+                  <div className="allyPhaseItems">
+                    <div className="allyItem"><span className="allyDot"/>Book the college counselor meeting. Bring this playbook. Use the Meeting Kit in this document. Most parents come empty-handed — you won't.</div>
+                    <div className="allyItem"><span className="allyDot"/>Build the college list together: 3–4 reach schools, 4–5 target schools, 3–4 safety schools. A good safety school is one they'd genuinely be happy to attend — not a punishment.</div>
+                    <div className="allyItem"><span className="allyDot"/>Register for the PSAT (October) and plan the SAT/ACT timeline. Most students test 2–3 times. Schedule it now so it doesn't sneak up.</div>
+                    <div className="allyItem"><span className="allyDot"/>Identify teacher recommenders. These relationships take time. Encourage your child to connect genuinely with 2–3 teachers whose classes they've taken this year — not just to get a letter, but because those teachers will write better letters for students they actually know.</div>
+                    <div className="allyItem"><span className="allyDot"/>Your job: logistics and calm. Handle the calendar, the reminders, the test registration. Your child's job: the academic performance and the authentic story. Don't cross the line.</div>
+                  </div>
+                </div>
+
+                <div className="allyPhase">
+                  <div className="allyPhaseHead">
+                    <span className="allyPhaseTag">Junior Year — Spring Semester</span>
+                    <span className="allyPhaseName">Preparation Phase — Build the Application Foundation</span>
+                  </div>
+                  <div className="allyPhaseItems">
+                    <div className="allyItem"><span className="allyDot"/>Finalize the college list. Every school on it should have a clear "why this school" answer — colleges can tell when an application is generic.</div>
+                    <div className="allyItem"><span className="allyDot"/>Begin the essay brainstorm — not the writing, the thinking. The best personal statement topics often come from a 30-minute conversation where you ask: "What's something you've never put on an application but that says something true about who you are?"</div>
+                    <div className="allyItem"><span className="allyDot"/>Submit the FAFSA as early as possible (opens October 1 of senior year — plan now). Many merit scholarships are first-come, first-served. Being late costs real money.</div>
+                    <div className="allyItem"><span className="allyDot"/>Update and polish the Brag Sheet. This is the document that goes to teacher recommenders, the counselor, and gets referenced in every essay.</div>
+                    <div className="allyItem"><span className="allyDot"/>Take the final SAT/ACT if scores still need improvement. Don't let this drag into senior fall when application pressure peaks.</div>
+                  </div>
+                </div>
+
+                <div className="allyPhase">
+                  <div className="allyPhaseHead">
+                    <span className="allyPhaseTag">Senior Year — Fall (Aug–Nov)</span>
+                    <span className="allyPhaseName">Execution Phase — Ship the Applications</span>
+                  </div>
+                  <div className="allyPhaseItems">
+                    <div className="allyItem"><span className="allyDot"/>Create a shared tracking doc: every school, every deadline, every required component. Make it visible. Check it weekly together — briefly, not obsessively.</div>
+                    <div className="allyItem"><span className="allyDot"/>Early Decision/Early Action deadlines are typically Nov 1–15. If there's a clear first choice, ED can meaningfully improve admission odds at many schools. Understand the binding vs. non-binding distinction.</div>
+                    <div className="allyItem"><span className="allyDot"/>Read essays as a supportive audience, not an editor. Your job is to ask "does this sound like you?" — not to polish their voice into yours. Admissions officers are trained to spot parental rewrites.</div>
+                    <div className="allyItem"><span className="allyDot"/>Make sure recommendation requests went out 6–8 weeks before the first deadline. Follow up with a polite reminder if needed. Teachers are managing hundreds of requests.</div>
+                    <div className="allyItem"><span className="allyDot"/>Protect your child's mental health. This is the highest-anxiety stretch of the process. Normalize uncertainty. Celebrate the submission of each application — not just the outcomes.</div>
+                  </div>
+                </div>
+
+                <div className="allyPhase">
+                  <div className="allyPhaseHead">
+                    <span className="allyPhaseTag">Decision Season (Dec–May)</span>
+                    <span className="allyPhaseName">Perspective Phase — Keep the Long View</span>
+                  </div>
+                  <div className="allyPhaseItems">
+                    <div className="allyItem"><span className="allyDot"/>When decisions arrive: celebrate acceptances without comparisons to peers. Rejections are not verdicts on your child's worth — they are one committee's read of an incomplete picture.</div>
+                    <div className="allyItem"><span className="allyDot"/>Compare financial aid packages carefully. A $20K difference in aid over 4 years is $80K — that changes the calculus on a lot of schools. Teach your child to read an offer letter, not just the acceptance.</div>
+                    <div className="allyItem"><span className="allyDot"/>Visit admitted student days for the top 2–3 choices if possible. The campus that felt theoretical in a brochure often feels obvious or wrong in person.</div>
+                    <div className="allyItem"><span className="allyDot"/>Let them make the final decision. Your role is to make sure they have good information and feel supported — not to steer them toward the school you would have chosen. Their ownership of the decision matters for how they show up when they get there.</div>
+                    <div className="allyItem"><span className="allyDot"/>May 1 is National Decision Day. After that: housing forms, FAFSA verification, and the final transcript. You're almost done. Breathe.</div>
+                  </div>
+                </div>
+
+              </div>
+
+              <div className="allyFootnote">
+                The research is consistent: students whose parents are engaged but not controlling are less anxious, more resilient when things don't go as planned, and more satisfied with their college choice. Your job is to be the calmest, best-informed person in the room. This playbook is a start.
+              </div>
+            </div>
+          </div>
 
           {pb.aiRule && <div className="section">
             <div className="aiRuleBox">
@@ -739,6 +1060,9 @@ export default function App() {
             <p>Explore 35+ careers scored for AI resistance. Contribute your perspective and download the complete research document.</p>
             <a href="https://thriving-shortbread-3bf879.netlify.app" target="_blank" rel="noopener noreferrer" className="Rc">Explore the Full Career Guide →</a>
           </div>
+
+          {/* ---- Feature Request Form ---- */}
+          <FeatureRequestForm studentGrade={a.grade} />
 
           {/* ---- Print footer ---- */}
           <div className="print-only print-footer">
@@ -909,8 +1233,27 @@ export default function App() {
 .csStep{display:flex;gap:10px;align-items:flex-start;margin-bottom:8px;font-size:14px;color:var(--text-muted)}
 .csNum{width:22px;height:22px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;font-family:'DM Mono',monospace}
 
-/* AI Rule */
-.aiRuleBox{background:var(--bg-card);border:1px solid rgba(37,99,235,.25);border-radius:12px;padding:24px}
+/* Meeting kit sub-label */
+.mkSub{font-size:12px;color:var(--text-dim);margin-bottom:10px;font-style:italic}
+
+/* Parent as the Ally Model */
+.allyBox{background:var(--bg-card);border:1px solid rgba(37,99,235,.25);border-radius:14px;padding:28px}
+.allyHeader{display:flex;align-items:flex-start;gap:16px;margin-bottom:28px}
+.allyIcon{font-size:28px;color:var(--blue);flex-shrink:0;margin-top:2px}
+.allyTitle{font-family:'Playfair Display',serif;font-size:22px;color:var(--text);font-weight:700;margin-bottom:6px}
+.allySub{font-size:14px;color:var(--text-muted);line-height:1.6}
+.allyPhases{display:flex;flex-direction:column;gap:0}
+.allyPhase{border-top:1px solid var(--border-mid);padding:20px 0}
+.allyPhase:first-child{border-top:none;padding-top:0}
+.allyPhaseHead{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.allyPhaseTag{font-family:'DM Mono',monospace;font-size:10px;font-weight:500;color:var(--blue);background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.2);padding:3px 10px;border-radius:20px;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+.allyPhaseName{font-size:15px;font-weight:600;color:var(--text)}
+.allyPhaseItems{display:flex;flex-direction:column;gap:10px}
+.allyItem{display:flex;align-items:flex-start;gap:10px;font-size:14px;color:var(--text-muted);line-height:1.6}
+.allyDot{width:6px;height:6px;border-radius:50%;background:var(--blue);flex-shrink:0;margin-top:7px}
+.allyFootnote{margin-top:24px;padding-top:20px;border-top:1px solid var(--border-mid);font-size:13px;color:var(--text-dim);line-height:1.7;font-style:italic}
+
+/* AI Rule */{background:var(--bg-card);border:1px solid rgba(37,99,235,.25);border-radius:12px;padding:24px}
 .arTitle{font-family:'Playfair Display',serif;font-size:20px;color:var(--text);margin-bottom:4px;font-weight:700}
 .arSub{font-size:12px;color:var(--blue);margin-bottom:14px;font-family:'DM Mono',monospace}
 .arInsight{font-size:15px;color:var(--text-muted);line-height:1.7;margin-bottom:12px}
@@ -958,10 +1301,59 @@ export default function App() {
   .profV{color:#0f172a!important}
   svg text{fill:#0f172a!important}
   svg path[stroke="#10b981"],svg path[stroke="#f59e0b"],svg path[stroke="#ef4444"]{stroke:#2563EB!important}
+  .allyBox{border:1px solid #bfdbfe!important;background:#f8fafc!important}
+  .allyTitle{color:#0f172a!important}
+  .allySub,.allyItem,.allyFootnote{color:#334155!important}
+  .allyPhaseTag{background:#eff6ff!important;color:#1d4ed8!important;border-color:#bfdbfe!important}
+  .allyPhaseName{color:#0f172a!important}
+  .allyDot{background:#2563EB!important}
   .buildCard{border:1px solid #e2e8f0!important;background:#f8fafc!important}
   .buildAct{color:#0f172a!important}
   .buildConn{color:#475569!important}
 }
+
+/* Feature Request Form */
+.frWrap{margin-top:24px}
+.frTeaser{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:20px 24px;background:var(--bg-card);border:1px solid var(--border-mid);border-radius:12px;flex-wrap:wrap}
+.frTeaserTitle{font-size:15px;font-weight:600;color:var(--text);margin-bottom:4px}
+.frTeaserSub{font-size:13px;color:var(--text-muted);line-height:1.5}
+.frOpenBtn{padding:10px 20px;background:transparent;border:1px solid var(--blue);color:var(--blue);border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;white-space:nowrap;transition:all .2s}
+.frOpenBtn:hover{background:var(--blue);color:#fff}
+.frPanel{background:var(--bg-card);border:1px solid rgba(37,99,235,.3);border-radius:12px;padding:24px}
+.frPanelHead{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:24px}
+.frPanelTitle{font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:var(--text);margin-bottom:4px}
+.frPanelSub{font-size:13px;color:var(--text-muted);line-height:1.5}
+.frClose{background:none;border:none;color:var(--text-dim);font-size:18px;cursor:pointer;padding:4px 8px;border-radius:4px;flex-shrink:0}.frClose:hover{color:var(--text-muted)}
+.frForm{display:flex;flex-direction:column;gap:18px}
+.frRow{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.frField{display:flex;flex-direction:column;gap:6px}
+.frLabel{font-size:12px;font-weight:500;color:var(--text-muted);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:.06em}
+.frOpt{font-weight:400;color:var(--text-dim);text-transform:none;letter-spacing:0}
+.frReq{color:var(--blue)}
+.frInput{padding:12px 14px;background:rgba(255,255,255,.03);border:1px solid var(--border-mid);border-radius:6px;color:var(--text);font-size:14px;font-family:'Inter',sans-serif;outline:none;transition:border-color .2s;width:100%}
+.frInput:focus{border-color:rgba(37,99,235,.5)}
+.frInput::placeholder{color:var(--text-dim)}
+.frTextarea{padding:12px 14px;background:rgba(255,255,255,.03);border:1px solid var(--border-mid);border-radius:6px;color:var(--text);font-size:14px;font-family:'Inter',sans-serif;outline:none;transition:border-color .2s;resize:vertical;line-height:1.6;width:100%}
+.frTextarea:focus{border-color:rgba(37,99,235,.5)}
+.frTextarea::placeholder{color:var(--text-dim)}
+.frSelect{padding:12px 14px;background:rgba(255,255,255,.03);border:1px solid var(--border-mid);border-radius:6px;color:var(--text);font-size:14px;font-family:'Inter',sans-serif;outline:none;transition:border-color .2s;width:100%;cursor:pointer}
+.frSelect:focus{border-color:rgba(37,99,235,.5)}
+.frPills{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px}
+.frPill{padding:8px 14px;background:rgba(255,255,255,.03);border:1px solid var(--border-mid);border-radius:20px;color:var(--text-muted);font-size:13px;cursor:pointer;font-family:'Inter',sans-serif;transition:all .2s}
+.frPill:hover{border-color:rgba(37,99,235,.4)}.frPill.sel{border-color:var(--blue);background:rgba(37,99,235,.1);color:var(--text)}
+.frActions{display:flex;justify-content:flex-end;gap:10px;margin-top:4px}
+.frCancel{padding:10px 20px;background:transparent;border:1px solid var(--border-mid);color:var(--text-muted);border-radius:6px;font-size:14px;cursor:pointer;font-family:'Inter',sans-serif;transition:all .2s}
+.frCancel:hover{border-color:var(--text-dim);color:var(--text)}
+.frSubmit{padding:10px 24px;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;transition:all .2s}
+.frSubmit.active{background:var(--blue);color:#fff}.frSubmit.active:hover{background:var(--blue-hover)}
+.frSubmit.disabled{background:rgba(255,255,255,.05);color:var(--text-dim);cursor:not-allowed}
+.frError{font-size:13px;color:#fca5a5;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:6px;padding:10px 14px}
+.frSuccess{text-align:center;padding:32px 24px;display:flex;flex-direction:column;align-items:center;gap:12px}
+.frSuccessIcon{width:48px;height:48px;border-radius:50%;background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.3);display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--blue)}
+.frSuccessTitle{font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:var(--text)}
+.frSuccessMsg{font-size:14px;color:var(--text-muted);line-height:1.7;max-width:480px}
+.frSuccessBtn{margin-top:8px;padding:10px 24px;background:var(--blue);color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif}
+@media(max-width:600px){.frRow{grid-template-columns:1fr}.frTeaser{flex-direction:column;align-items:flex-start}.frActions{flex-direction:column}.frSubmit,.frCancel{width:100%;text-align:center}}
 
 /* Animations */
 @keyframes fiu{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
