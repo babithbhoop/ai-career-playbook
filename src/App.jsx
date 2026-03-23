@@ -703,6 +703,150 @@ function VoiceSelect({ options, onSelect, matchKey = "label" }) {
   );
 }
 
+
+/* ================================================================
+   AI TOOLKIT — per-step tool recommendations
+   ================================================================ */
+const AI_TOOLKIT = {
+  1: { // Grade
+    title: "Start here: AI tools for career exploration",
+    intro: "Great time to introduce your child to AI tools built for their age. These are the best places to begin.",
+    tools: [
+      { name: "Coach by CareerVillage", what: "Free AI career coach built for high schoolers — explores options, builds resumes, preps for interviews", tag: "Free", url: "https://www.aicareercoach.org/high-school-students" },
+      { name: "O*NET Interest Profiler", what: "US Dept of Labor tool — maps interests to real career paths using the same model colleges and counselors use", tag: "Free", url: "https://www.mynextmove.org/explore/ip" },
+      { name: "ChatGPT", what: "Ask it anything about a career — a typical day, what school subjects matter most, what skills employers look for", tag: "Free", url: "https://chatgpt.com" },
+      { name: "Claude", what: "Great for nuanced career research — ask it to compare two careers, explain salary trajectories, or decode job postings", tag: "Free", url: "https://claude.ai" },
+    ]
+  },
+  2: { // Interests
+    title: "Explore your child's interests with AI",
+    intro: "These tools go deeper on interest-to-career mapping — beyond simple quizzes.",
+    tools: [
+      { name: "Career Explorer (Sokanu)", what: "Takes a 15-min interest quiz and surfaces careers ranked by match — includes day-in-the-life breakdowns", tag: "Free", url: "https://www.careerexplorer.com" },
+      { name: "Google Career Dreamer", what: "Google's free tool for connecting life experiences and interests to career paths — well-designed for students", tag: "Free", url: "https://grow.google/students" },
+      { name: "Perplexity AI", what: "Ask 'what careers combine [interest 1] and [interest 2]?' — gives sourced, current answers unlike a basic Google search", tag: "Free", url: "https://www.perplexity.ai" },
+      { name: "YouScience", what: "Aptitude-based assessment using neuroscience — uncovers natural talents beyond self-reported interests. Used by schools.", tag: "Paid (often school-provided)", url: "https://www.youscience.com" },
+    ]
+  },
+  3: { // Priority
+    title: "AI tools to research career priorities",
+    intro: "Help your child ground their priorities in real data — not assumptions.",
+    tools: [
+      { name: "CareerOneStop (BLS)", what: "Dept of Labor tool with real salary, growth, and job outlook data for every career — searchable by priority", tag: "Free", url: "https://www.careeronestop.org" },
+      { name: "LinkedIn (free tier)", what: "Search any job title — see how many postings exist, what skills are required, and what companies are hiring", tag: "Free", url: "https://www.linkedin.com/jobs" },
+      { name: "Glassdoor", what: "Real salary data from real workers — helps ground salary expectations before setting priorities", tag: "Free", url: "https://www.glassdoor.com" },
+      { name: "Claude or ChatGPT", what: "Ask: 'What careers have the highest job security AND salary for someone interested in [X]?' — great for priority tradeoffs", tag: "Free", url: "https://claude.ai" },
+    ]
+  },
+  4: { // Tech comfort
+    title: "Build AI fluency — free resources by level",
+    intro: "AI fluency is the #1 skill premium right now (PwC: +56% wages). Here's how to build it at every comfort level.",
+    tools: [
+      { name: "Google's AI Essentials", what: "Free beginner course — learn how to use AI tools practically in everyday work and school tasks (no coding required)", tag: "Free", url: "https://grow.google/products/ai-essentials/" },
+      { name: "Khan Academy + Khanmigo", what: "Free AI tutor for every subject — great for students who want to use AI to strengthen their weakest academic areas", tag: "Free", url: "https://www.khanacademy.org" },
+      { name: "MIT OpenCourseWare (AI intro)", what: "Free MIT course materials — for students ready to go deeper into how AI actually works", tag: "Free", url: "https://ocw.mit.edu/search/?q=artificial+intelligence" },
+      { name: "GitHub Copilot (student)", what: "Free for verified students — AI coding assistant that teaches while you build. Best intro for hands-on learners.", tag: "Free (students)", url: "https://github.com/features/copilot/plans" },
+    ]
+  },
+  5: { // Concern
+    title: "AI tools to address your specific career concerns",
+    intro: "These tools provide data-backed answers to the questions parents and students worry about most.",
+    tools: [
+      { name: "World Economic Forum Future of Jobs", what: "The actual research behind AI's job impact — searchable by industry. Counters fear with data.", tag: "Free", url: "https://www.weforum.org/reports/the-future-of-jobs-report-2025/" },
+      { name: "Perplexity AI", what: "Ask it your exact concern — 'Will AI replace nurses?' or 'What happens to software jobs by 2030?' — sourced answers", tag: "Free", url: "https://www.perplexity.ai" },
+      { name: "ONET Online", what: "For any job: see exactly which tasks are at risk vs. which require human judgment. Data-backed, not opinion.", tag: "Free", url: "https://www.onetonline.org" },
+      { name: "Burning Glass / EMSI Lightcast", what: "Real-time labor market data used by universities and employers — shows actual hiring trends by career", tag: "Free (limited)", url: "https://lightcast.io/open-skills" },
+    ]
+  },
+  6: { // Subjects
+    title: "Turn academic strengths into career signals",
+    intro: "AI tools that connect what your child is good at now to where that leads professionally.",
+    tools: [
+      { name: "Naviance", what: "School-based platform that maps academic strengths to college programs and career paths — ask your counselor if your school uses it", tag: "Free (school-provided)", url: "https://www.naviance.com" },
+      { name: "NotebookLM (Google)", what: "Upload class notes and ask 'what careers use skills from this subject?' — genuinely useful for subject-to-career bridging", tag: "Free", url: "https://notebooklm.google.com" },
+      { name: "Claude", what: "Ask: 'My child excels at [subjects]. What careers use all three of these strengths?' — gets specific, ranked answers", tag: "Free", url: "https://claude.ai" },
+      { name: "Wolfram Alpha", what: "For math and science students — shows how mathematical concepts directly connect to engineering, physics, and research careers", tag: "Free (basic)", url: "https://www.wolframalpha.com" },
+    ]
+  },
+  7: { // Activities
+    title: "AI tools to amplify extracurriculars",
+    intro: "Help your child see the career value in what they're already doing — and find ways to deepen it.",
+    tools: [
+      { name: "LinkedIn (student profile)", what: "Create a student profile now — list activities, get a professional digital presence before college applications", tag: "Free", url: "https://www.linkedin.com" },
+      { name: "ChatGPT", what: "Paste your activity list and ask: 'Which of these activities are most relevant to [career]? What should I add?' — instant coaching", tag: "Free", url: "https://chatgpt.com" },
+      { name: "Handshake", what: "College-focused job and internship platform — students can browse to see what activities lead to which opportunities", tag: "Free", url: "https://joinhandshake.com" },
+      { name: "Common App Activities Section Guide", what: "AI-assisted tool for framing activities for college apps — transforms a list into a compelling narrative", tag: "Free", url: "https://www.commonapp.org/apply/essay-prompts" },
+    ]
+  },
+  8: { // Accomplishments
+    title: "AI tools to document and showcase accomplishments",
+    intro: "The brag sheet is just the start. These tools help package accomplishments for colleges and employers.",
+    tools: [
+      { name: "Teal (resume builder)", what: "AI-powered resume builder that helps students frame accomplishments in professional language — free for students", tag: "Free", url: "https://www.tealhq.com" },
+      { name: "Grammarly", what: "Paste any accomplishment description — it helps refine the language for applications, essays, and brag sheets", tag: "Free (basic)", url: "https://www.grammarly.com" },
+      { name: "ChatGPT", what: "Give it raw accomplishments and ask: 'Rewrite these as strong bullet points for a college application' — remarkable results", tag: "Free", url: "https://chatgpt.com" },
+      { name: "Scoir", what: "Free college planning platform that tracks accomplishments, activities, and connects them to college applications", tag: "Free", url: "https://www.scoir.com" },
+    ]
+  },
+  9: { // Final details
+    title: "Get ready for the next step",
+    intro: "Tools to prepare for college counselor meetings, college research, and what comes after this playbook.",
+    tools: [
+      { name: "College Board BigFuture", what: "Free college search with scholarship matching — filter by major, size, location, and financial aid", tag: "Free", url: "https://bigfuture.collegeboard.org" },
+      { name: "Niche.com", what: "Student reviews of colleges and careers — real perspectives that cut through the marketing", tag: "Free", url: "https://www.niche.com" },
+      { name: "FAFSA (studentaid.gov)", what: "Financial aid application — open it now to understand what to prepare. Don't wait until senior fall.", tag: "Free", url: "https://studentaid.gov/h/apply-for-aid/fafsa" },
+      { name: "Claude or ChatGPT", what: "Paste your playbook results and ask: 'Help me prepare questions for my college counselor meeting focused on [career]'", tag: "Free", url: "https://claude.ai" },
+    ]
+  },
+};
+
+const TAG_STYLE = {
+  "Free": { bg: "rgba(37,99,235,.1)", color: "#93c5fd" },
+  "Freemium": { bg: "rgba(180,120,0,.12)", color: "#fbbf24" },
+  "Free (basic)": { bg: "rgba(37,99,235,.1)", color: "#93c5fd" },
+  "Free (students)": { bg: "rgba(37,99,235,.1)", color: "#93c5fd" },
+  "Free (school-provided)": { bg: "rgba(37,99,235,.1)", color: "#93c5fd" },
+  "Free (limited)": { bg: "rgba(37,99,235,.1)", color: "#93c5fd" },
+  "Paid (often school-provided)": { bg: "rgba(100,100,100,.15)", color: "#94a3b8" },
+  "Paid": { bg: "rgba(100,100,100,.15)", color: "#94a3b8" },
+};
+
+function AIToolkit({ step }) {
+  const [open, setOpen] = useState(false);
+  const data = AI_TOOLKIT[step];
+  if (!data) return null;
+
+  return (
+    <div className="atkWrap no-print">
+      <button className="atkToggle" onClick={() => setOpen(o => !o)}>
+        <span className="atkToggleIcon">{open ? "▾" : "▸"}</span>
+        <span className="atkToggleLabel">AI Toolkit for this step</span>
+        <span className="atkToggleSub">— {data.tools.filter(t => t.tag.startsWith("Free")).length} free tools</span>
+      </button>
+      {open && (
+        <div className="atkPanel">
+          <div className="atkTitle">{data.title}</div>
+          <div className="atkIntro">{data.intro}</div>
+          <div className="atkTools">
+            {data.tools.map((tool, i) => {
+              const ts = TAG_STYLE[tool.tag] || TAG_STYLE["Freemium"];
+              return (
+                <a key={i} className="atkTool" href={tool.url} target="_blank" rel="noopener noreferrer">
+                  <div className="atkToolTop">
+                    <span className="atkToolName">{tool.name}</span>
+                    <span className="atkTag" style={{ background: ts.bg, color: ts.color }}>{tool.tag}</span>
+                  </div>
+                  <div className="atkToolWhat">{tool.what}</div>
+                </a>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ================================================================
    MAIN APP
    ================================================================ */
@@ -976,6 +1120,8 @@ export default function App() {
               </label>
             </div>
           </div>}
+
+          <AIToolkit step={step} />
 
           <div className="An">
             <button className={`Nb ${ok() ? "ac" : "di"}`} disabled={!ok()} onClick={() => step === 9 ? generate() : setStep(s => s + 1)}>
@@ -1657,6 +1803,24 @@ export default function App() {
 .vcError{display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.2);border-radius:8px;font-size:13px;color:#fca5a5}
 .vcError span{flex:1}
 .vcRedo{background:none;border:none;color:var(--blue);font-size:12px;cursor:pointer;font-family:'Inter',sans-serif;text-decoration:underline;text-underline-offset:3px;white-space:nowrap}
+
+/* AI Toolkit */
+.atkWrap{margin-bottom:20px;border-radius:10px;overflow:hidden;border:1px solid var(--border-mid)}
+.atkToggle{width:100%;display:flex;align-items:center;gap:8px;padding:12px 16px;background:rgba(37,99,235,.04);border:none;cursor:pointer;font-family:'Inter',sans-serif;text-align:left;transition:background .2s}
+.atkToggle:hover{background:rgba(37,99,235,.08)}
+.atkToggleIcon{font-size:11px;color:var(--blue);flex-shrink:0;width:12px}
+.atkToggleLabel{font-size:13px;font-weight:600;color:var(--text);font-family:'DM Mono',monospace;letter-spacing:.04em}
+.atkToggleSub{font-size:12px;color:var(--text-dim)}
+.atkPanel{padding:16px;background:var(--bg-card);border-top:1px solid var(--border-mid)}
+.atkTitle{font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:var(--text);margin-bottom:4px}
+.atkIntro{font-size:13px;color:var(--text-muted);margin-bottom:14px;line-height:1.5}
+.atkTools{display:grid;gap:8px}
+.atkTool{display:block;padding:12px 14px;background:rgba(255,255,255,.02);border:1px solid var(--border-mid);border-radius:8px;text-decoration:none;transition:border-color .2s,background .2s}
+.atkTool:hover{border-color:rgba(37,99,235,.4);background:rgba(37,99,235,.04)}
+.atkToolTop{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:5px;flex-wrap:wrap}
+.atkToolName{font-size:14px;font-weight:600;color:var(--text)}
+.atkTag{font-size:10px;font-weight:500;padding:2px 8px;border-radius:20px;white-space:nowrap;font-family:'DM Mono',monospace;letter-spacing:.04em}
+.atkToolWhat{font-size:12px;color:var(--text-muted);line-height:1.5}
 /* Animations */
 @keyframes fiu{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
 @keyframes fl{0%,100%{transform:translate(0,0)}50%{transform:translate(30px,-20px)}}
