@@ -81,13 +81,35 @@ const TECHC = [
   { id: "handson", label: "Prefers Hands-On", desc: "Would rather build, create, or be outdoors" },
 ];
 
-const CONCERNS = [
+const CONCERNS_K12 = [
   { id: "entry_level", label: "Entry-level jobs are disappearing before my kid graduates" },
   { id: "ai_replace", label: "AI will make their chosen field obsolete" },
   { id: "no_direction", label: "My child has no idea what they want to do" },
   { id: "debt_roi", label: "College debt won't pay off in this economy" },
   { id: "too_late", label: "We are already behind and don't know where to start" },
 ];
+
+const CONCERNS_COLLEGE = [
+  { id: "c_entry", label: "Entry-level jobs are disappearing before I graduate" },
+  { id: "c_obsolete", label: "AI will make my chosen field obsolete" },
+  { id: "c_direction", label: "I have no idea what I want to do after college" },
+  { id: "c_roi", label: "My degree won't pay off in this economy" },
+  { id: "c_plan", label: "I am graduating soon and don't have a real plan" },
+];
+
+const CONCERNS_ADULT = [
+  { id: "a_stuck", label: "I feel stuck or dissatisfied in my current career" },
+  { id: "a_obsolete", label: "AI will make my field obsolete" },
+  { id: "a_direction", label: "I have no idea what I actually want to do next" },
+  { id: "a_late", label: "I am worried it is too late to change careers" },
+  { id: "a_risk", label: "I cannot afford the risk of starting over" },
+];
+
+const CONCERNS = CONCERNS_K12; // default / back-compat
+const ALL_CONCERNS = [...CONCERNS_K12, ...CONCERNS_COLLEGE, ...CONCERNS_ADULT];
+function getConcerns(audience) {
+  return audience === "adult" ? CONCERNS_ADULT : audience === "college" ? CONCERNS_COLLEGE : CONCERNS_K12;
+}
 
 const SUBJECTS = [
   { id: "math", label: "Math" }, { id: "english", label: "English / Writing" },
@@ -176,15 +198,46 @@ const TOTAL_STEPS = 9;
    COMPACT JSON PROMPT (70% cheaper than prose prompt)
    ================================================================ */
 function buildPrompt(a) {
-  const concernLabel = CONCERNS.find(c => c.id === a.concern)?.label || a.concern;
+  const concernLabel = ALL_CONCERNS.find(c => c.id === a.concern)?.label || a.concern;
   const subjectLabels = a.subjectText || a.subjects.map(s => SUBJECTS.find(x => x.id === s)?.label).join(", ");
   const interestLabels = a.interests.map(i => INTERESTS.find(x => x.id === i)?.label).join(", ");
+  const audience = a.grade === "adult" ? "adult" : a.grade === "college" ? "college" : "k12";
+
+  const careersDB = `Careers DB: Counselor 98%, Firefighter 97%, Physician 96%, Diplomat 95%, NP 94%, Electrician 94%, Social Worker 93%, Renewable Tech 92%, Cybersecurity 88%, Creative Dir 85%, Robotics 85%, Trial Lawyer 82%, AI Engineer 78%, UX 78%, Fin Advisor 76%, Software Dev 62%, Accountant 45%`;
+
+  if (audience === "adult") {
+    return `Return ONLY valid JSON. No markdown. No backticks. Start with { end with }. All strings under 90 chars. No special characters in values.
+
+Adult exploring a career change. Interests: ${interestLabels}, priority: ${a.priority}, background and skills: ${subjectLabels}, current/past work: ${a.activities || "none"}, achievements: ${a.accomplishments || "none"}${a.specificCareer ? ", considering: " + a.specificCareer : ""}, context: ${a.extraContext || "none"}
+
+${careersDB}
+
+This person is likely dissatisfied, stuck, or seeking something new. Be direct, practical, encouraging. No college or counselor language.
+
+{"careers":[{"n":"career name","s":88,"f":"why this fits their experience and transferable skills"}],"buildOn":[{"a":"their existing skill or experience","c":"how it transfers to the new direction","d":"leverage or build"}],"qs":["a sharp question to ask in an informational interview with someone in the target field"],"concern":"direct, hopeful response to their concern about: ${concernLabel}","aiTip":"one specific way to use AI to accelerate their career pivot"}
+
+5 careers, 3 buildOn, 5 qs. Speak to an experienced adult, not a student.`;
+  }
+
+  if (audience === "college") {
+    return `Return ONLY valid JSON. No markdown. No backticks. Start with { end with }. All strings under 90 chars. No special characters in values.
+
+College student. Interests: ${interestLabels}, priority: ${a.priority}, field of study and strengths: ${subjectLabels}, activities and experience: ${a.activities || "none"}, achievements: ${a.accomplishments || "none"}${a.specificCareer ? ", considering: " + a.specificCareer : ""}
+
+${careersDB}
+
+This person is already in college and needs to convert their degree into a launched career. Focus on internships, proof of work, networking, first roles. No high school or parent language.
+
+{"careers":[{"n":"career name","s":88,"f":"why this fits their study and experience"}],"buildOn":[{"a":"their current activity or coursework","c":"career connection","d":"deepen or add"}],"qs":["a smart question to ask career services or a mentor in the target field"],"concern":"direct response to their concern about: ${concernLabel}","aiTip":"one specific way to use AI to stand out in their target field"}
+
+5 careers, 3 buildOn, 5 qs. Speak to a college student preparing to launch.`;
+  }
 
   return `Return ONLY valid JSON. No markdown. No backticks. Start with { end with }. All strings under 80 chars. No special characters in values.
 
 Student: ${a.grade} grade, interests: ${interestLabels}, priority: ${a.priority}, subjects: ${subjectLabels}, activities: ${a.activities || "none"}, accomplishments: ${a.accomplishments || "none"}${a.specificCareer ? ", considering: " + a.specificCareer : ""}
 
-Careers DB: Counselor 98%, Firefighter 97%, Physician 96%, Diplomat 95%, NP 94%, Electrician 94%, Social Worker 93%, Renewable Tech 92%, Cybersecurity 88%, Creative Dir 85%, Robotics 85%, Trial Lawyer 82%, AI Engineer 78%, UX 78%, Fin Advisor 76%, Software Dev 62%, Accountant 45%
+${careersDB}
 
 {"careers":[{"n":"career name","s":88,"f":"why fits this student"}],"buildOn":[{"a":"their activity","c":"career connection","d":"deepen or add"}],"qs":["counselor question"],"concern":"response to: ${concernLabel}","aiTip":"how to combine their interests with AI skills"}
 
@@ -378,6 +431,45 @@ function BragRow({ label, items }) {
     </div>
   );
 }
+
+// Stage card for Launch Plan (college) and Reinvention Roadmap (adult)
+function StageCard({ stage, idx, total }) {
+  return (
+    <div className="stageCard">
+      <div className="stageRail">
+        <div className="stageNum">{idx + 1}</div>
+        {idx < total - 1 && <div className="stageLine" />}
+      </div>
+      <div className="stageBody">
+        <div className="stageHead">
+          <span className="stageTag">{stage.tag}</span>
+          <span className="stageName">{stage.name}</span>
+        </div>
+        <div className="stageItems">
+          {stage.items.map((item, i) => (
+            <div key={i} className="stageItem"><span className="stageDot" />{item}</div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Resource card for college and adult kits
+function ResourceCard({ r }) {
+  const ts = TAG_STYLE[r.tag] || { bg: "rgba(180,120,0,.12)", color: "#fbbf24" };
+  return (
+    <a className="resourceCard" href={r.url} target="_blank" rel="noopener noreferrer">
+      <div className="resourceTop">
+        <span className="resourceName">{r.name}</span>
+        <span className="resourceTag" style={{ background: ts.bg, color: ts.color }}>{r.tag}</span>
+      </div>
+      <div className="resourceWhat">{r.what}</div>
+    </a>
+  );
+}
+
+
 
 /* ================================================================
    FEATURE REQUEST FORM COMPONENT
@@ -739,6 +831,131 @@ function VoiceSelect({ options, onSelect, matchKey = "label" }) {
 
 
 /* ================================================================
+   AUDIENCE-SPECIFIC CONTENT — College & Adult pathways
+   ================================================================ */
+
+// College: a 4-stage plan to convert a degree into a launched career
+const LAUNCH_PLAN = [
+  {
+    tag: "Start Now",
+    name: "Maximize Your Time in College",
+    items: [
+      "Take one course outside your major that points toward your target career area.",
+      "Join the student chapter of a professional association in your field. Most are free or near-free for students.",
+      "Build a real relationship with one professor who can mentor you and write a strong recommendation later.",
+      "Turn your class projects into portfolio pieces. The work is already done. Document it properly.",
+    ],
+  },
+  {
+    tag: "This Semester / Summer",
+    name: "Build Proof of Work",
+    items: [
+      "Do a free virtual job simulation on Forage to test a career before you commit to it.",
+      "Apply for paid micro-internships on Parker Dewey. They are 5 to 40 hours, remote, and real.",
+      "Start a portfolio now: GitHub for anything technical, a simple personal site for everything else.",
+      "Take on one real project (freelance, club, or volunteer) that you can point to and say I built that.",
+    ],
+  },
+  {
+    tag: "Ongoing",
+    name: "Network Into the Field",
+    items: [
+      "Optimize your LinkedIn. A student profile with projects and a clear direction beats a blank one every time.",
+      "Do three informational interviews with people in your target role. Most say yes when a student asks well.",
+      "Attend one industry meetup, hackathon, or conference. Many are free for students and worth a dozen applications.",
+      "Connect with alumni from your school working in your target field. Shared school is the warmest cold outreach there is.",
+    ],
+  },
+  {
+    tag: "6 to 12 Months Out",
+    name: "Land the Role",
+    items: [
+      "Use Handshake for internships and entry-level roles built specifically for students and new grads.",
+      "Set up RippleMatch and Wellfound for early-career and startup matching. Startups hire students readily.",
+      "Earn one certification that complements your degree and signals seriousness in your target field.",
+      "Practice interviews with AI first (Claude or ChatGPT), then with humans. Cheap reps build real confidence.",
+    ],
+  },
+];
+
+const COLLEGE_KIT = [
+  { name: "Handshake", what: "The main internship and entry-job platform built for students and new grads", tag: "Free", url: "https://joinhandshake.com" },
+  { name: "Forage", what: "Free virtual job simulations from real companies. Test a career risk-free before applying", tag: "Free", url: "https://www.theforage.com" },
+  { name: "Parker Dewey", what: "Paid micro-internships, 5 to 40 hours, remote. Build real experience while studying", tag: "Free to join", url: "https://www.parkerdewey.com/career-launchers" },
+  { name: "LinkedIn", what: "Student profile, alumni networking, and recruiter visibility. Set Open to Work when ready", tag: "Free", url: "https://www.linkedin.com" },
+  { name: "GitHub", what: "Portfolio home for any technical or data work. Employers look here before they call", tag: "Free", url: "https://github.com" },
+  { name: "RippleMatch", what: "Early-career matching platform that brings entry roles and internships to you", tag: "Free", url: "https://ripplematch.com" },
+  { name: "Coursera / edX", what: "University-grade certifications that complement your degree. Free to audit most courses", tag: "Free to audit", url: "https://www.coursera.org" },
+  { name: "Claude or ChatGPT", what: "Resume polishing, interview practice, and decoding any job posting into what they actually want", tag: "Free", url: "https://claude.ai" },
+];
+
+// Adult: a 5-stage low-risk reinvention roadmap
+const REINVENTION_ROADMAP = [
+  {
+    tag: "Weeks 1 to 4",
+    name: "Clarify — You Are Not Starting Over",
+    items: [
+      "Map your transferable skills: the ones you have used regardless of job title. These are your real assets.",
+      "Run the free O*NET and CareerOneStop skills profiler to see exactly where your skills already transfer.",
+      "Use Google Career Dreamer to connect your lived experience to new directions you may not have considered.",
+      "Name what is actually wrong: pay, meaning, autonomy, or growth. Targeting the right problem saves you years.",
+    ],
+  },
+  {
+    tag: "Months 1 to 2 — Keep Your Job",
+    name: "Explore — Test Cheaply Before You Leap",
+    items: [
+      "Do three to five informational interviews in your target field. Roughly 85% of jobs come through networking.",
+      "Test the field for the cost of a weekend: one course, one small project, one volunteer task.",
+      "Join one community of practice (Slack, Discord, or a focused subreddit). Lurk, learn the language, ask questions.",
+      "Find your minimum viable pivot: the smallest real task in the new field you can actually do this month.",
+    ],
+  },
+  {
+    tag: "Months 3 to 6 — Still Employed",
+    name: "Build — Skills and Proof, in Parallel",
+    items: [
+      "Pick one credential that signals the switch: a Google Career Certificate, freeCodeCamp (free), or a field-specific cert.",
+      "Build proof of work: a portfolio, a side project, or a first paid gig on Upwork or Contra.",
+      "Use AI as your accelerant. It compresses the learning curve for a new field more than anything else available.",
+      "Apply your new skills inside your current job wherever you can. It is the cheapest real experience you will ever get.",
+    ],
+  },
+  {
+    tag: "Months 6 to 12",
+    name: "Bridge — Build a Ramp, Not a Cliff",
+    items: [
+      "Start earning in the new field part-time through freelance or contract work before you depend on it.",
+      "Reframe your LinkedIn around the pivot: Former [your field] moving into [target field], with the proof to back it.",
+      "Target startups and small companies. They hire career changers far more readily than large firms with rigid filters.",
+      "Build a financial runway so the move is a planned step down a ramp, not a jump off a ledge.",
+    ],
+  },
+  {
+    tag: "When the Pieces Line Up",
+    name: "Leap — Move From Strength",
+    items: [
+      "Make the move when proof of work, a real network, and some income in the new field line up. You will rarely feel fully ready.",
+      "You do not need to be perfect. You need to be credible and resourced. Those are different things.",
+      "Negotiate from strength. You bring years of transferable experience, not a blank page. Price yourself accordingly.",
+      "Keep one foot in your old network. Career changers who burn nothing down get referrals from both worlds.",
+    ],
+  },
+];
+
+const ADULT_KIT = [
+  { name: "Google Career Dreamer", what: "Maps your experience and skills to new career paths, AI-assisted. Great first step", tag: "Free", url: "https://grow.google/career-dreamer/" },
+  { name: "O*NET / CareerOneStop", what: "The government standard for transferable-skills assessment and real salary and demand data", tag: "Free", url: "https://www.careeronestop.org" },
+  { name: "Google Career Certificates", what: "Job-ready credentials in data, IT, project management, UX, and more. Months, not years", tag: "7-day free trial, then paid", url: "https://grow.google/certificates" },
+  { name: "freeCodeCamp", what: "Completely free, project-based curriculum. The strongest free on-ramp into tech for career changers", tag: "Free", url: "https://www.freecodecamp.org" },
+  { name: "Coursera / edX", what: "University courses and professional certificates. Financial aid available on most of them", tag: "Free to audit", url: "https://www.coursera.org" },
+  { name: "Upwork / Contra", what: "Build a portfolio and side income in the new field while you keep your day job", tag: "Free to join", url: "https://www.contra.com" },
+  { name: "LinkedIn", what: "Reframe your story, reconnect your network, and switch on Open to Work for your target roles", tag: "Free", url: "https://www.linkedin.com" },
+  { name: "Claude or ChatGPT", what: "Rewrite your resume for the pivot, prep for interviews, and run an honest skill-gap analysis", tag: "Free", url: "https://claude.ai" },
+];
+
+
+/* ================================================================
    AI TOOLKIT — per-step tool recommendations
    ================================================================ */
 const AI_TOOLKIT = {
@@ -1008,7 +1225,14 @@ export default function App() {
         setStep(11); setLoading(false); return;
       }
       // Merge API response with client-side templates
+      const audience = a.grade === "adult" ? "adult" : a.grade === "college" ? "college" : "k12";
+      const concernStepsByAudience = {
+        k12: ["Research the top career match from this playbook this week", "Have a conversation with your child using the talking points above", "Schedule a counselor meeting and bring this printed playbook"],
+        college: ["Pick your top career match and do one Forage simulation or Parker Dewey project in it this month", "Book three informational interviews with people already in that role", "Set up Handshake and LinkedIn properly this week, with your projects front and center"],
+        adult: ["Map your transferable skills against your top career match this week, no leap required", "Do three informational interviews in the target field before changing anything", "Pick one credential or one small paid project to start building proof while you stay employed"],
+      };
       const fullPb = {
+        audience,
         careers: (parsed.careers || []).map(c => ({
           name: c.n || c.name || "Career",
           score: c.s || c.score || 80,
@@ -1027,11 +1251,11 @@ export default function App() {
         concernResponse: {
           headline: parsed.concern || "The data shows a path forward",
           data: "PwC found workers with AI skills earn 56% more in every industry. The premium doubled in 12 months.",
-          steps: ["Research the top career match from this playbook this week", "Have a conversation with your child using the talking points above", "Schedule a counselor meeting and bring this printed playbook"],
+          steps: concernStepsByAudience[audience],
         },
         aiRule: {
           insight: parsed.aiTip || "Combining domain expertise with AI fluency is the highest-value career strategy in every field",
-          action: "Start with one AI tool relevant to their primary interest area this month",
+          action: "Start with one AI tool relevant to your primary interest area this month",
         },
       };
       setProgress(100);
@@ -1052,6 +1276,76 @@ export default function App() {
   const interestLabels = a.interests.map(i => INTERESTS.find(x => x.id === i)?.label).join(", ");
   const subjectLabels = a.subjectText || a.subjects.map(s => SUBJECTS.find(x => x.id === s)?.label).join(", ");
   const priorityLabel = PRIORITIES.find(p => p.id === a.priority)?.label || "";
+  const audience = pb?.audience || (a.grade === "adult" ? "adult" : a.grade === "college" ? "college" : "k12");
+  const subjectFieldLabel = audience === "adult" ? "Skills & Background" : audience === "college" ? "Field & Strengths" : "Strong Subjects";
+  const QC = {
+    k12: {
+      s2t: "What are their top interests?",
+      s3t: "What matters most for their career?",
+      s4t: "How does your child feel about technology?",
+      s4d: "This shapes how we integrate AI fluency into their path. Or just say it — \"loves technology\" or \"prefers hands-on\".",
+      s5t: "What is your biggest career concern?",
+      s5d: "Your playbook will address this head-on with data. Or just say it — \"AI replacing jobs\" or \"college debt\".",
+      s6t: "What subjects or topics genuinely excite them?",
+      s6d: "Write it however feels natural. \"She loves biology and can't stop reading about genetics\" is perfect. So is \"he's really into coding and building things.\" We'll figure out the rest.",
+      s6p: "Try something like:\n\u2022 She lights up in chemistry, loves science\n\u2022 Obsessed with coding, built apps already\n\u2022 Strong in writing and history, hates math\n\u2022 Loves performing arts and music",
+      s7t: "What extracurriculars and activities are they involved in?",
+      s7d: "List everything: clubs, sports, volunteering, jobs, hobbies, music. Or tap the mic and just talk — we'll capture it all.",
+      s7p: "e.g. Varsity soccer (3 years), robotics club president, volunteers at animal shelter, plays guitar, summer job at vet clinic, debate team...",
+      s8t: "Any accomplishments, awards, or milestones?",
+      s8d: "These will appear in your printable Brag Sheet. Ask your child directly — tap the mic and let them tell you.",
+      s8p: "e.g. Honor roll 3 semesters, won regional science fair (2nd place), Eagle Scout, AP Scholar, speaks conversational Spanish, built an app for school project...",
+      s9nameL: "Student's first name (for the printed profile)",
+      s9nameP: "e.g. Sarah, Marcus, Thea...",
+      s9careerL: "Specific career they are considering?",
+      s9careerP: "e.g. Neurosurgeon, cybersecurity analyst, electrician...",
+      s9ctxP: "e.g. Great at math but shy. Has ADHD, thrives hands-on. First-gen college student...",
+    },
+    college: {
+      s2t: "What are your top interests?",
+      s3t: "What matters most in your career?",
+      s4t: "How do you feel about technology?",
+      s4d: "This shapes how we weave AI fluency into your launch plan. Or just say it — \"loves technology\" or \"prefers hands-on\".",
+      s5t: "What is your biggest career concern?",
+      s5d: "Your playbook will address this head-on with data. Or just say it — \"AI replacing jobs\" or \"no real plan\".",
+      s6t: "What subjects or topics genuinely excite you?",
+      s6d: "Write it however feels natural. \"I love my data classes and can't stop building side projects\" is perfect. We'll figure out the rest.",
+      s6p: "Try something like:\n\u2022 Love my data and stats classes, build side projects\n\u2022 Drawn to design and how people use things\n\u2022 Strong writer, fascinated by psychology\n\u2022 Enjoy economics and anything with real-world impact",
+      s7t: "What experience and activities do you have?",
+      s7d: "Coursework, internships, clubs, jobs, projects, research. Or tap the mic and just talk — we'll capture it all.",
+      s7p: "e.g. CS major, summer internship at a fintech, hackathon winner, teaching assistant, freelance web projects, robotics club...",
+      s8t: "Any accomplishments, awards, or milestones?",
+      s8d: "These sharpen your launch plan and resume. Tap the mic and just talk if that is easier.",
+      s8p: "e.g. Dean's list, published research, won a case competition, built an app with 500 users, led a 12-person club...",
+      s9nameL: "Your first name (for the printed plan)",
+      s9nameP: "e.g. Harman, Marcus, Priya...",
+      s9careerL: "A specific career or role you are targeting?",
+      s9careerP: "e.g. Data analyst, UX designer, product manager, cybersecurity analyst...",
+      s9ctxP: "e.g. Graduating in 2026, open to relocating, strong in stats, want remote-friendly roles...",
+    },
+    adult: {
+      s2t: "What are your top interests?",
+      s3t: "What matters most in your next career?",
+      s4t: "How do you feel about technology?",
+      s4d: "This shapes how we weave AI fluency into your pivot. Or just say it — \"loves technology\" or \"prefers hands-on\".",
+      s5t: "What is your biggest career concern?",
+      s5d: "Your playbook will address this head-on with data. Or just say it — \"feeling stuck\" or \"too late to change\".",
+      s6t: "What subjects, topics, or kinds of work genuinely excite you?",
+      s6d: "Write it however feels natural. \"I love writing and the parts of my job where I get to mentor people\" is perfect. We'll figure out the rest.",
+      s6p: "Try something like:\n\u2022 Love writing and storytelling, drained by admin work\n\u2022 The best part of my job is mentoring and people\n\u2022 Drawn to design, psychology, how things work\n\u2022 Want work with more meaning and autonomy",
+      s7t: "What is your work and life experience so far?",
+      s7d: "Jobs, projects, side gigs, volunteering, skills you have built over the years. Or tap the mic and just talk.",
+      s7p: "e.g. 8 years in media and content, managed a small team, freelance writing, ran community events, comfortable with analytics...",
+      s8t: "What are you most proud of, or known for?",
+      s8d: "Wins, recognition, things people come to you for. This becomes the proof you build your pivot on. Tap the mic if that is easier.",
+      s8p: "e.g. Grew a newsletter to 20k readers, awarded top performer twice, mentored 5 junior writers, self-taught video editing...",
+      s9nameL: "Your first name (for the printed plan)",
+      s9nameP: "e.g. Harman, David, Aisha...",
+      s9careerL: "A specific career or direction you are considering?",
+      s9careerP: "e.g. UX research, product management, instructional design, data analytics...",
+      s9ctxP: "e.g. Turning 30 and want more meaning, need to keep my income while I transition, strong writer, open to learning tech...",
+    },
+  }[audience];
   const progressPct = step >= 1 && step <= 9 ? (step / TOTAL_STEPS) * 100 : 0;
 
   // Print handler
@@ -1066,8 +1360,8 @@ export default function App() {
         <div className="Wo o1"/><div className="Wo o2"/><div className="Wo o3"/>
         <div className="Wc">
           <div className="Wb">Free · 17 Research Sources · 35+ Careers Scored</div>
-          <h1 className="Wh">Get Your Child's<br/><span className="Wa">AI-Proof Career Playbook</span></h1>
-          <p className="Ws">Answer a few questions about your child. Get a personalized, visual career strategy with a printable Student Profile you can take to your next college counselor meeting.</p>
+          <h1 className="Wh">Your<br/><span className="Wa">AI-Proof Career Playbook</span></h1>
+          <p className="Ws">Whether you are planning for your child, launching from college, or rethinking your own career, answer a few questions and get a personalized, visual strategy built on the research.</p>
           <div className="Wst">
             <div className="Wsi"><div className="Wn">$1.5M</div><div className="Wl">Lifetime gap: AI-fluent<br/>vs. non-AI-fluent workers</div></div>
             <div className="Wdv"/>
@@ -1078,9 +1372,9 @@ export default function App() {
           <button className="Cb" onClick={() => setStep(1)}>Build My Playbook <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
           <div className="Ww">
             <div className="Wwi">✓ Visual AI Resistance Gauges for career matches</div>
-            <div className="Wwi">✓ Year-by-Year Timeline with specific action items</div>
-            <div className="Wwi">✓ Printable Brag Sheet formatted for counselors</div>
-            <div className="Wwi">✓ College Counselor Meeting Kit with tailored questions</div>
+            <div className="Wwi">✓ A staged action plan built for your situation</div>
+            <div className="Wwi">✓ Concrete resources, tools, and next steps</div>
+            <div className="Wwi">✓ Printable and shareable, in your browser</div>
           </div>
           <p className="Wf">No login. No email. Completely free.<br/>Built by <strong>Babith Bhoopalan</strong> · Quantumleap Insights LLC</p>
         </div>
@@ -1095,12 +1389,12 @@ export default function App() {
         </div>
         <div className="Aby">
 
-          {step === 1 && <div className="Q"><div className="Qn">01</div><h2 className="Qt">What grade is your child in?</h2><p className="Qd">This determines the timeline for your action plan.</p>
+          {step === 1 && <div className="Q"><div className="Qn">01</div><h2 className="Qt">Who is this playbook for?</h2><p className="Qd">Pick the option that fits. This shapes your entire plan.</p>
             <div className="Ol">{GRADES.map(g => <button key={g.id} className={`Ob ${a.grade === g.id ? "s" : ""}`} onClick={() => set("grade", g.id)}><span className="Or">{a.grade === g.id ? "◉" : "○"}</span>{g.label}</button>)}</div>
             <VoiceSelect options={GRADES} onSelect={(id) => set("grade", id)} currentValue={a.grade} />
           </div>}
 
-          {step === 2 && <div className="Q"><div className="Qn">02</div><h2 className="Qt">What are their top interests?</h2><p className="Qd">Pick up to 3 areas, or speak them — say something like "healthcare and technology".</p>
+          {step === 2 && <div className="Q"><div className="Qn">02</div><h2 className="Qt">{QC.s2t}</h2><p className="Qd">Pick up to 3 areas, or speak them — say something like "healthcare and technology".</p>
             <div className="Ig">{INTERESTS.map(o => <button key={o.id} className={`Ic ${a.interests.includes(o.id) ? "s" : ""}`} onClick={() => toggleInt(o.id)}>
               <span className="Ii">{o.ico}</span><span className="Il">{o.label}</span><span className="Ie">{o.ex}</span>
               {a.interests.includes(o.id) && <span className="Ik">✓</span>}
@@ -1109,33 +1403,33 @@ export default function App() {
             <VoiceSelect options={INTERESTS} onSelect={(id) => toggleInt(id)} currentValue={a.interests} matchKey="label" />
           </div>}
 
-          {step === 3 && <div className="Q"><div className="Qn">03</div><h2 className="Qt">What matters most for their career?</h2><p className="Qd">Pick the single most important factor, or say it — "job security" or "earning potential".</p>
+          {step === 3 && <div className="Q"><div className="Qn">03</div><h2 className="Qt">{QC.s3t}</h2><p className="Qd">Pick the single most important factor, or say it — "job security" or "earning potential".</p>
             <div className="Ol">{PRIORITIES.map(p => <button key={p.id} className={`Ob hd ${a.priority === p.id ? "s" : ""}`} onClick={() => set("priority", p.id)}>
               <span className="Or">{a.priority === p.id ? "◉" : "○"}</span><div><div className="Om">{p.label}</div><div className="Od">{p.desc}</div></div>
             </button>)}</div>
             <VoiceSelect options={PRIORITIES} onSelect={(id) => set("priority", id)} currentValue={a.priority} />
           </div>}
 
-          {step === 4 && <div className="Q"><div className="Qn">04</div><h2 className="Qt">How does your child feel about technology?</h2><p className="Qd">This shapes how we integrate AI fluency into their path. Or just say it — "loves technology" or "prefers hands-on".</p>
+          {step === 4 && <div className="Q"><div className="Qn">04</div><h2 className="Qt">{QC.s4t}</h2><p className="Qd">{QC.s4d}</p>
             <div className="Ol">{TECHC.map(t => <button key={t.id} className={`Ob hd ${a.techComfort === t.id ? "s" : ""}`} onClick={() => set("techComfort", t.id)}>
               <span className="Or">{a.techComfort === t.id ? "◉" : "○"}</span><div><div className="Om">{t.label}</div><div className="Od">{t.desc}</div></div>
             </button>)}</div>
             <VoiceSelect options={TECHC} onSelect={(id) => set("techComfort", id)} currentValue={a.techComfort} />
           </div>}
 
-          {step === 5 && <div className="Q"><div className="Qn">05</div><h2 className="Qt">What is your biggest career concern?</h2><p className="Qd">Your playbook will address this head-on with data. Or just say it — "AI replacing jobs" or "college debt".</p>
-            <div className="Ol">{CONCERNS.map(c => <button key={c.id} className={`Ob ${a.concern === c.id ? "s" : ""}`} onClick={() => set("concern", c.id)}>
+          {step === 5 && <div className="Q"><div className="Qn">05</div><h2 className="Qt">{QC.s5t}</h2><p className="Qd">{QC.s5d}</p>
+            <div className="Ol">{getConcerns(audience).map(c => <button key={c.id} className={`Ob ${a.concern === c.id ? "s" : ""}`} onClick={() => set("concern", c.id)}>
               <span className="Or">{a.concern === c.id ? "◉" : "○"}</span>{c.label}
             </button>)}</div>
-            <VoiceSelect options={CONCERNS} onSelect={(id) => set("concern", id)} currentValue={a.concern} />
+            <VoiceSelect options={getConcerns(audience)} onSelect={(id) => set("concern", id)} currentValue={a.concern} />
           </div>}
 
           {step === 6 && <div className="Q"><div className="Qn">06</div>
-            <h2 className="Qt">What subjects or topics genuinely excite them?</h2>
-            <p className="Qd">Write it however feels natural. "She loves biology and can't stop reading about genetics" is perfect. So is "he's really into coding and building things." We'll figure out the rest.</p>
+            <h2 className="Qt">{QC.s6t}</h2>
+            <p className="Qd">{QC.s6d}</p>
             <textarea
               className={`Ta subjectTa ${subjectErr ? "err" : a.subjectText.length > 10 && !isGibberish(a.subjectText) ? "ok" : ""}`}
-              placeholder={"Try something like:\n\u2022 She lights up in chemistry, loves science\n\u2022 Obsessed with coding, built apps already\n\u2022 Strong in writing and history, hates math\n\u2022 Loves performing arts and music"}
+              placeholder={QC.s6p}
               value={a.subjectText}
               onChange={e => handleSubjectText(e.target.value)}
               rows={5}
@@ -1155,28 +1449,28 @@ export default function App() {
             <p className="Qh2">{a.subjectText.length}/500 characters</p>
           </div>}
 
-          {step === 7 && <div className="Q"><div className="Qn">07</div><h2 className="Qt">What extracurriculars and activities are they involved in?</h2><p className="Qd">List everything: clubs, sports, volunteering, jobs, hobbies, music. Or tap the mic and just talk — we'll capture it all.</p>
-            <textarea className="Ta" placeholder="e.g. Varsity soccer (3 years), robotics club president, volunteers at animal shelter, plays guitar, summer job at vet clinic, debate team..." value={a.activities} onChange={e => set("activities", e.target.value)} rows={4}/>
+          {step === 7 && <div className="Q"><div className="Qn">07</div><h2 className="Qt">{QC.s7t}</h2><p className="Qd">{QC.s7d}</p>
+            <textarea className="Ta" placeholder={QC.s7p} value={a.activities} onChange={e => set("activities", e.target.value)} rows={4}/>
             <VoiceCapture onTranscript={(text, final) => { if (text) set("activities", text); }} />
             <p className="Qh2">The more you share, the more personalized your playbook will be</p>
           </div>}
 
-          {step === 8 && <div className="Q"><div className="Qn">08</div><h2 className="Qt">Any accomplishments, awards, or milestones?</h2><p className="Qd">These will appear in your printable Brag Sheet. Ask your child directly — tap the mic and let them tell you.</p>
-            <textarea className="Ta" placeholder="e.g. Honor roll 3 semesters, won regional science fair (2nd place), Eagle Scout, AP Scholar, speaks conversational Spanish, built an app for school project..." value={a.accomplishments} onChange={e => set("accomplishments", e.target.value)} rows={4}/>
+          {step === 8 && <div className="Q"><div className="Qn">08</div><h2 className="Qt">{QC.s8t}</h2><p className="Qd">{QC.s8d}</p>
+            <textarea className="Ta" placeholder={QC.s8p} value={a.accomplishments} onChange={e => set("accomplishments", e.target.value)} rows={4}/>
             <VoiceCapture onTranscript={(text, final) => { if (text) set("accomplishments", text); }} />
             <p className="Qh2">Don't be modest. Everything counts.</p>
           </div>}
 
           {step === 9 && <div className="Q"><div className="Qn">09</div><h2 className="Qt">Final details</h2><p className="Qd">Optional. These make your playbook even more specific.</p>
             <div className="Tf">
-              <label className="Fl">Student's first name (for the printed profile)
-                <input type="text" className="Ti" placeholder="e.g. Sarah, Marcus, Thea..." value={a.studentName} onChange={e => set("studentName", e.target.value)}/>
+              <label className="Fl">{QC.s9nameL}
+                <input type="text" className="Ti" placeholder={QC.s9nameP} value={a.studentName} onChange={e => set("studentName", e.target.value)}/>
               </label>
-              <label className="Fl">Specific career they are considering?
-                <input type="text" className="Ti" placeholder="e.g. Neurosurgeon, cybersecurity analyst, electrician..." value={a.specificCareer} onChange={e => set("specificCareer", e.target.value)}/>
+              <label className="Fl">{QC.s9careerL}
+                <input type="text" className="Ti" placeholder={QC.s9careerP} value={a.specificCareer} onChange={e => set("specificCareer", e.target.value)}/>
               </label>
-              <label className="Fl">Anything else? (strengths, challenges, financial situation)
-                <textarea className="Ta2" placeholder="e.g. Great at math but shy. Has ADHD, thrives hands-on. First-gen college student..." value={a.extraContext} onChange={e => set("extraContext", e.target.value)} rows={3}/>
+              <label className="Fl">Anything else? (strengths, challenges, situation)
+                <textarea className="Ta2" placeholder={QC.s9ctxP} value={a.extraContext} onChange={e => set("extraContext", e.target.value)} rows={3}/>
                 <VoiceCapture onTranscript={(text, final) => { if (text) set("extraContext", text); }} />
               </label>
             </div>
@@ -1231,16 +1525,16 @@ export default function App() {
             <p>Future-Proof Careers in the Age of AI · Quantumleap Insights LLC · {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p>
           </div>
 
-          {/* ---- SECTION 1: Student Profile ---- */}
+          {/* ---- SECTION 1: Profile ---- */}
           <div className="section" style={{ background: "rgba(99,102,241,0.04)", border: "1px solid rgba(99,102,241,0.12)", borderRadius: 16, padding: 24, marginBottom: 32 }}>
-            <h2 className="secTitle">Student Profile & Accomplishment Record</h2>
+            <h2 className="secTitle">{audience === "adult" ? "Your Profile & Experience" : audience === "college" ? "Your Profile & Background" : "Student Profile & Accomplishment Record"}</h2>
             <div className="profGrid">
               {a.studentName && <div className="profRow"><span className="profK">Name</span><span className="profV">{a.studentName}</span></div>}
-              <div className="profRow"><span className="profK">Grade</span><span className="profV">{gradeLabel}</span></div>
+              <div className="profRow"><span className="profK">{audience === "k12" ? "Grade" : "Stage"}</span><span className="profV">{gradeLabel}</span></div>
               <div className="profRow"><span className="profK">Interests</span><span className="profV">{interestLabels}</span></div>
-              <div className="profRow"><span className="profK">Strong Subjects</span><span className="profV">{subjectLabels}</span></div>
+              <div className="profRow"><span className="profK">{subjectFieldLabel}</span><span className="profV">{subjectLabels}</span></div>
               <div className="profRow"><span className="profK">Priority</span><span className="profV">{priorityLabel}</span></div>
-              {a.activities && <div className="profRow"><span className="profK">Activities</span><span className="profV">{a.activities}</span></div>}
+              {a.activities && <div className="profRow"><span className="profK">{audience === "k12" ? "Activities" : "Experience"}</span><span className="profV">{a.activities}</span></div>}
               {a.accomplishments && <div className="profRow"><span className="profK">Accomplishments</span><span className="profV">{a.accomplishments}</span></div>}
               {a.specificCareer && <div className="profRow"><span className="profK">Considering</span><span className="profV">{a.specificCareer}</span></div>}
             </div>
@@ -1249,7 +1543,7 @@ export default function App() {
           {/* ---- SECTION 2: Career Match Dashboard ---- */}
           <div className="section">
             <h2 className="secTitle">Your Top AI-Resistant Career Matches</h2>
-            <p className="secDesc">Ranked by fit to {a.studentName || "your child"}'s profile. Scores from 17 cross-referenced research sources.</p>
+            <p className="secDesc">{audience === "k12" ? `Ranked by fit to ${a.studentName || "your child"}'s profile.` : "Ranked by fit to your profile and experience."} Scores from 17 cross-referenced research sources.</p>
             <div className="careerGrid">
               {pb.careers?.map((c, i) => {
                 const dbEntry = CAREER_DB[c.name] || {};
@@ -1270,8 +1564,8 @@ export default function App() {
             </div>
           </div>
 
-          {/* ---- SECTION 3: Year-by-Year Timeline ---- */}
-          <div className="section">
+          {/* ---- SECTION 3: Action Plan (audience-specific) ---- */}
+          {audience === "k12" && <div className="section">
             <h2 className="secTitle">Year-by-Year Action Plan</h2>
             <p className="secDesc">Your personalized roadmap from {gradeLabel} through college.</p>
             <div className="timeline">
@@ -1279,23 +1573,58 @@ export default function App() {
                 <TimelineNode key={i} year={yp.year} data={yp} idx={i} total={pb.yearPlan.length} />
               ))}
             </div>
-          </div>
+          </div>}
+
+          {audience === "college" && <div className="section">
+            <h2 className="secTitle">Your Launch Plan</h2>
+            <p className="secDesc">You already chose your direction. Now convert the degree into a launched career. Four stages, concrete moves.</p>
+            <div className="stagePlan">
+              {LAUNCH_PLAN.map((stage, i) => <StageCard key={i} stage={stage} idx={i} total={LAUNCH_PLAN.length} />)}
+            </div>
+          </div>}
+
+          {audience === "adult" && <div className="section">
+            <h2 className="secTitle">The Reinvention Roadmap</h2>
+            <p className="secDesc">You are not starting over. You are redeploying years of experience into something that fits better. A low-risk path that keeps your income while you build.</p>
+            <div className="stagePlan">
+              {REINVENTION_ROADMAP.map((stage, i) => <StageCard key={i} stage={stage} idx={i} total={REINVENTION_ROADMAP.length} />)}
+            </div>
+          </div>}
 
           {/* ---- SECTION 4: Building on What You Have ---- */}
           {pb.buildOn && pb.buildOn.length > 0 && <div className="section">
-            <h2 className="secTitle">Building on What You Already Have</h2>
-            <p className="secDesc">{a.studentName || "Your child"} is NOT starting from zero. Here is how current activities connect to AI-resistant careers.</p>
+            <h2 className="secTitle">{audience === "adult" ? "Your Transferable Strengths" : audience === "college" ? "Skills You Can Already Put to Work" : "Building on What You Already Have"}</h2>
+            <p className="secDesc">{audience === "adult" ? "You are carrying skills that transfer directly. Here is where they land in your new direction." : audience === "college" ? "You are further along than you think. Here is how what you have already done connects to your target career." : `${a.studentName || "Your child"} is NOT starting from zero. Here is how current activities connect to AI-resistant careers.`}</p>
             <div className="buildGrid">
               {pb.buildOn.map((b, i) => (
                 <div key={i} className="buildCard">
                   <div className="buildAct">{b.activity}</div>
                   <div className="buildConn">→ {b.connection}</div>
-                  <div className={`buildAction ${b.action === "deepen" ? "deep" : "add"}`}>{b.action === "deepen" ? "DEEPEN" : "ADD"}</div>
+                  <div className={`buildAction ${b.action === "deepen" ? "deep" : "add"}`}>{b.action === "deepen" ? (audience === "adult" ? "LEVERAGE" : "DEEPEN") : (audience === "adult" ? "BUILD" : "ADD")}</div>
                 </div>
               ))}
             </div>
           </div>}
 
+          {/* ---- College / Adult Resource Kit ---- */}
+          {audience === "college" && <div className="section">
+            <h2 className="secTitle">College-to-Career Resource Kit</h2>
+            <p className="secDesc">The exact platforms students use to land internships, build proof of work, and get hired. Most are free.</p>
+            <div className="resourceGrid">
+              {COLLEGE_KIT.map((r, i) => <ResourceCard key={i} r={r} />)}
+            </div>
+          </div>}
+
+          {audience === "adult" && <div className="section">
+            <h2 className="secTitle">Career Changer Resource Kit</h2>
+            <p className="secDesc">The exact tools that make an adult pivot realistic: map your skills, reskill in months not years, and build proof while you stay employed.</p>
+            <div className="resourceGrid">
+              {ADULT_KIT.map((r, i) => <ResourceCard key={i} r={r} />)}
+            </div>
+          </div>}
+
+          {/* ---- SECTION 5-7: K-12 ONLY (Brag Sheet, Counselor Kit, Parent as Ally) ---- */}
+          {audience === "k12" && <>
           {/* ---- SECTION 5: Brag Sheet ---- */}
           <div className="section bragSheet">
             <h2 className="secTitle">Printable Brag Sheet</h2>
@@ -1411,8 +1740,9 @@ export default function App() {
 
             </div>
           </div>
+          </>}
 
-          {/* ---- SECTION 7: Concern + Parent as the Ally Model + 56% Rule ---- */}
+          {/* ---- SECTION 7: Concern (universal) ---- */}
           {pb.concernResponse && <div className="section">
             <h2 className="secTitle">Addressing Your Concern</h2>
             <div className="concernBox">
@@ -1425,8 +1755,8 @@ export default function App() {
             </div>
           </div>}
 
-          {/* ---- PARENT AS THE ALLY MODEL ---- */}
-          <div className="section">
+          {/* ---- PARENT AS THE ALLY MODEL (k12 only) ---- */}
+          {audience === "k12" && <div className="section">
             <div className="allyBox">
               <div className="allyHeader">
                 <div className="allyIcon">◈</div>
@@ -1527,7 +1857,7 @@ export default function App() {
                 The research is consistent: students whose parents are engaged but not controlling are less anxious, more resilient when things don't go as planned, and more satisfied with their college choice. Your job is to be the calmest, best-informed person in the room. This playbook is a start.
               </div>
             </div>
-          </div>
+          </div>}
 
           {pb.aiRule && <div className="section">
             <div className="aiRuleBox">
@@ -1804,6 +2134,15 @@ export default function App() {
   .buildCard{border:1px solid #e2e8f0!important;background:#f8fafc!important}
   .buildAct{color:#0f172a!important}
   .buildConn{color:#475569!important}
+  .stageNum{background:#2563EB!important;color:#fff!important}
+  .stageLine{background:#cbd5e1!important}
+  .stageName{color:#0f172a!important}
+  .stageItem{color:#334155!important}
+  .stageDot{background:#2563EB!important}
+  .stageTag{color:#1d4ed8!important}
+  .resourceCard{border:1px solid #e2e8f0!important;background:#f8fafc!important}
+  .resourceName{color:#0f172a!important}
+  .resourceWhat{color:#475569!important}
 }
 
 /* Feature Request Form */
@@ -1882,6 +2221,29 @@ export default function App() {
 .atkToolName{font-size:14px;font-weight:600;color:var(--text)}
 .atkTag{font-size:10px;font-weight:500;padding:2px 8px;border-radius:20px;white-space:nowrap;font-family:'DM Mono',monospace;letter-spacing:.04em}
 .atkToolWhat{font-size:12px;color:var(--text-muted);line-height:1.5}
+/* Stage Plan — Launch Plan & Reinvention Roadmap */
+.stagePlan{display:flex;flex-direction:column;gap:0}
+.stageCard{display:flex;gap:16px}
+.stageRail{display:flex;flex-direction:column;align-items:center;flex-shrink:0}
+.stageNum{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;font-family:'DM Mono',monospace;flex-shrink:0}
+.stageLine{width:2px;flex:1;background:var(--border-mid);margin:6px 0;min-height:20px}
+.stageBody{flex:1;padding-bottom:28px}
+.stageHead{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+.stageTag{font-family:'DM Mono',monospace;font-size:10px;font-weight:500;color:var(--blue);text-transform:uppercase;letter-spacing:.08em}
+.stageName{font-family:'Playfair Display',serif;font-size:18px;font-weight:700;color:var(--text);line-height:1.2}
+.stageItems{display:flex;flex-direction:column;gap:9px}
+.stageItem{display:flex;align-items:flex-start;gap:10px;font-size:14px;color:var(--text-muted);line-height:1.6}
+.stageDot{width:6px;height:6px;border-radius:50%;background:var(--blue);flex-shrink:0;margin-top:7px}
+
+/* Resource Kit grid */
+.resourceGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
+.resourceCard{display:block;padding:14px 16px;background:var(--bg-card);border:1px solid var(--border-mid);border-radius:10px;text-decoration:none;transition:border-color .2s,background .2s}
+.resourceCard:hover{border-color:rgba(37,99,235,.4);background:rgba(37,99,235,.04)}
+.resourceTop{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;flex-wrap:wrap}
+.resourceName{font-size:15px;font-weight:600;color:var(--text)}
+.resourceTag{font-size:10px;font-weight:500;padding:2px 8px;border-radius:20px;white-space:nowrap;font-family:'DM Mono',monospace;letter-spacing:.04em}
+.resourceWhat{font-size:12px;color:var(--text-muted);line-height:1.5}
+
 /* Animations */
 @keyframes fiu{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
 @keyframes fl{0%,100%{transform:translate(0,0)}50%{transform:translate(30px,-20px)}}
