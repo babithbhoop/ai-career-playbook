@@ -994,7 +994,7 @@ export default function App() {
     try {
       const res = await fetch("/api/generate", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1200, messages: [{ role: "user", content: buildPrompt(a) }] }),
+        body: JSON.stringify({ model: "claude-sonnet-4-5", max_tokens: 1200, messages: [{ role: "user", content: buildPrompt(a) }] }),
       });
       const data = await res.json();
       if (data.error) {
